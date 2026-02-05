@@ -102,18 +102,31 @@
       left: 0;
       top: 0;
       opacity: 0;
-      transition: opacity 0.2s ease;
+      transition: opacity 0.15s ease;
       pointer-events: none;
       font-family: 'Cormorant Garamond', Georgia, serif;
       font-style: italic;
       font-weight: 600;
       letter-spacing: 0.02em;
+      clip-path: inset(0 100% 0 0);
+      transform: translateX(-8px);
     }
     .hero h1 .hero-fn:hover .hero-fn-full {
       opacity: 0;
     }
     .hero h1 .hero-fn:hover .hero-fn-math {
       opacity: 1;
+      animation: draw-in-fx 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+    @keyframes draw-in-fx {
+      0% {
+        clip-path: inset(0 100% 0 0);
+        transform: translateX(-8px);
+      }
+      100% {
+        clip-path: inset(0 0 0 0);
+        transform: translateX(0);
+      }
     }
     .hero h1 .hero-fn .hero-fn-full {
       transition: opacity 0.2s ease;
