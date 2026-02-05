@@ -1,0 +1,2186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <title>PolicyFunction — Backtest & Share</title>
+  <link rel="icon" href="/favicon.png" type="image/png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;1,500&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0a0a0b;
+      --surface: #141416;
+      --surface2: #1c1c1f;
+      --border: #2a2a2e;
+      --text: #e4e4e7;
+      --muted: #71717a;
+      --accent: #22d3ee;
+      --accent-dim: rgba(34, 211, 238, 0.15);
+      --strategy: #a78bfa;
+      --strategy-dim: rgba(167, 139, 250, 0.2);
+      --spy: #34d399;
+      --spy-dim: rgba(52, 211, 153, 0.15);
+      --danger: #f87171;
+      --success: #4ade80;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      font-family: 'DM Sans', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    .page {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 1.5rem 4rem;
+    }
+
+    /* Hero */
+    .hero {
+      padding: 4rem 0 3rem;
+      text-align: center;
+    }
+
+    .hero h1 {
+      font-size: clamp(2.25rem, 6vw, 3.5rem);
+      font-weight: 700;
+      letter-spacing: -0.04em;
+      margin: 0 0 0.5rem;
+      background: linear-gradient(110deg, #22d3ee 0%, #a78bfa 25%, #06b6d4 50%, #c084fc 75%, #22d3ee 100%);
+      background-size: 200% auto;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      animation: hero-gradient 6s ease-in-out infinite;
+      filter: drop-shadow(0 0 24px rgba(34, 211, 238, 0.25)) drop-shadow(0 0 48px rgba(167, 139, 250, 0.15));
+    }
+
+    @keyframes hero-gradient {
+      0%, 100% { background-position: 0% center; }
+      50% { background-position: 100% center; }
+    }
+
+    .hero h1 .hero-fn {
+      display: inline-block;
+      position: relative;
+      vertical-align: bottom;
+      margin-left: 0.25em;
+      background: linear-gradient(110deg, #22d3ee 0%, #a78bfa 25%, #06b6d4 50%, #c084fc 75%, #22d3ee 100%);
+      background-size: 200% auto;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      animation: hero-gradient 6s ease-in-out infinite;
+    }
+    .hero h1 .hero-fn .hero-fn-full,
+    .hero h1 .hero-fn .hero-fn-math {
+      background: linear-gradient(110deg, #22d3ee 0%, #a78bfa 25%, #06b6d4 50%, #c084fc 75%, #22d3ee 100%);
+      background-size: 200% auto;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      animation: hero-gradient 6s ease-in-out infinite;
+    }
+    .hero h1 .hero-fn .hero-fn-math {
+      position: absolute;
+      left: 0;
+      top: 0;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+      pointer-events: none;
+      font-family: 'Cormorant Garamond', Georgia, serif;
+      font-style: italic;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+    .hero h1 .hero-fn:hover .hero-fn-full {
+      opacity: 0;
+    }
+    .hero h1 .hero-fn:hover .hero-fn-math {
+      opacity: 1;
+    }
+    .hero h1 .hero-fn .hero-fn-full {
+      transition: opacity 0.2s ease;
+      opacity: 1;
+    }
+
+    .hero p {
+      font-size: 1.1rem;
+      color: var(--muted);
+      max-width: 480px;
+      margin: 0 auto 2rem;
+    }
+
+    /* Strategy cards */
+    .strategies {
+      display: grid;
+      gap: 1rem;
+      margin-top: 2rem;
+    }
+
+    .strategy-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .strategy-card:hover {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px var(--accent-dim);
+    }
+
+    .strategy-card.expanded {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px var(--accent-dim);
+    }
+    .strategy-card-single {
+      margin-top: 0;
+    }
+    .strategy-card-single .strategy-body {
+      padding-top: 0;
+    }
+
+    .strategy-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      padding: 1rem 1.25rem;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .strategy-header:focus {
+      outline: none;
+    }
+
+    .strategy-title {
+      font-size: 1.05rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      letter-spacing: -0.02em;
+    }
+
+    .strategy-title .badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.65rem;
+      font-weight: 500;
+      padding: 0.2em 0.45em;
+      background: var(--accent-dim);
+      color: var(--accent);
+      border-radius: 6px;
+      letter-spacing: 0.02em;
+    }
+
+    .strategy-meta {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      color: var(--muted);
+      font-weight: 400;
+    }
+
+    .strategy-body {
+      display: block;
+      padding: 0 1.25rem 1.25rem;
+      border-top: 1px solid var(--border);
+    }
+
+    .strategy-card:not(.expanded) .strategy-body {
+      display: none;
+    }
+
+    .strategy-card.expanded .strategy-body {
+      animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    /* Replay controls */
+    .replay-section {
+      margin-bottom: 1.5rem;
+    }
+
+    .replay-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      margin-bottom: 0.5rem;
+      font-weight: 500;
+    }
+    #metrics-as-of {
+      margin-bottom: 0.6rem;
+      opacity: 0.85;
+    }
+
+    .replay-controls {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .replay-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 40px;
+      height: 40px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s;
+    }
+
+    .replay-btn:hover {
+      background: var(--border);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .replay-slider-wrap {
+      flex: 1;
+      min-width: 200px;
+    }
+
+    .replay-slider {
+      width: 100%;
+      height: 8px;
+      -webkit-appearance: none;
+      appearance: none;
+      background: var(--surface2);
+      border-radius: 4px;
+      outline: none;
+    }
+
+    .replay-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+      box-shadow: 0 0 0 2px var(--bg);
+    }
+
+    .replay-slider::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+      border: none;
+    }
+
+    .replay-date {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.9rem;
+      color: var(--muted);
+      min-width: 100px;
+      text-align: right;
+    }
+
+    /* Chart containers */
+    .chart-grid {
+      display: grid;
+      gap: 1.25rem;
+    }
+
+    .chart-wrap {
+      background: var(--surface2);
+      border-radius: 8px;
+      padding: 0.9rem 1rem;
+      border: 1px solid var(--border);
+    }
+
+    .chart-wrap h3 {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--muted);
+      margin: 0 0 0.6rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .chart-container {
+      position: relative;
+      height: 280px;
+    }
+
+    .chart-container svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    .chart-container .axis-line {
+      stroke: var(--border);
+      stroke-width: 1;
+    }
+    .chart-container .axis-text {
+      fill: var(--muted);
+      font-size: 11px;
+      font-family: 'JetBrains Mono', monospace;
+      text-anchor: middle;
+    }
+    .chart-container .axis-text.y-axis {
+      text-anchor: end;
+    }
+
+    .chart-container.tall {
+      height: 220px;
+    }
+    .chart-container {
+      position: relative;
+    }
+    .chart-tooltip {
+      display: none;
+      position: absolute;
+      pointer-events: none;
+      z-index: 10;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.5rem 0.75rem;
+      font-size: 0.8rem;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      white-space: nowrap;
+    }
+    .chart-tooltip.visible {
+      display: block;
+    }
+    .chart-tooltip .tooltip-date { color: var(--muted); margin-bottom: 0.25rem; }
+    .chart-tooltip .tooltip-row { display: flex; justify-content: space-between; gap: 1rem; }
+    .chart-tooltip .tooltip-row span:first-child { color: var(--muted); }
+
+    /* Strategy study: per-strategy boxes */
+    .strategy-study-box {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem;
+      margin-bottom: 1.25rem;
+    }
+    .strategy-study-box-bench {
+      border-left: 3px solid var(--spy);
+    }
+    .strategy-study-box h4 {
+      font-size: 1.1rem;
+      margin: 0 0 0.35rem;
+      color: var(--text);
+    }
+    .strategy-study-box .study-rule {
+      font-size: 0.9rem;
+      color: var(--muted);
+      margin: 0 0 0.75rem;
+    }
+    .strategy-study-metrics {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-bottom: 1rem;
+      font-size: 0.9rem;
+    }
+    .strategy-study-metrics span {
+      color: var(--muted);
+    }
+    .strategy-study-metrics strong {
+      font-family: 'JetBrains Mono', monospace;
+      margin-right: 0.25rem;
+    }
+    .strategy-study-chart {
+      border-radius: 8px;
+      overflow: hidden;
+      background: rgba(0,0,0,0.2);
+    }
+    .strategy-study-chart svg {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+    .strategy-study-chart .legend {
+      margin-top: 0.35rem;
+      margin-bottom: 0;
+    }
+    .strategy-study-chart .legend span { font-size: 0.75rem; }
+
+    /* Metrics */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      gap: 0;
+      margin-bottom: 1.75rem;
+      align-items: stretch;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    @media (max-width: 900px) {
+      .metrics-grid {
+        grid-template-columns: repeat(4, 1fr);
+      }
+    }
+    @media (max-width: 520px) {
+      .metrics-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    .metric {
+      padding: 1rem 1rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      min-height: 72px;
+      border-right: 1px solid var(--border);
+      transition: background 0.15s ease;
+    }
+    .metric:last-child {
+      border-right: none;
+    }
+    @media (max-width: 900px) {
+      .metric { border-bottom: 1px solid var(--border); }
+      .metrics-grid .metric:nth-child(4n) { border-right: none; }
+      .metrics-grid .metric:nth-last-child(-n+4) { border-bottom: none; }
+    }
+    @media (max-width: 520px) {
+      .metrics-grid .metric:nth-child(4n) { border-right: 1px solid var(--border); }
+      .metrics-grid .metric:nth-child(2n) { border-right: none; }
+      .metrics-grid .metric:nth-last-child(-n+4) { border-bottom: 1px solid var(--border); }
+      .metrics-grid .metric:nth-last-child(-n+2) { border-bottom: none; }
+    }
+
+    .metric:hover {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .metric-label {
+      font-size: 0.65rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 0.35rem;
+      font-weight: 600;
+      line-height: 1.2;
+    }
+
+    .metric-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.15rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.3;
+    }
+
+    .metric-value.positive { color: var(--success); }
+    .metric-value.negative { color: var(--danger); }
+
+    /* Legend */
+    .legend {
+      display: flex;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+      margin-top: 0.5rem;
+      font-size: 0.8rem;
+    }
+
+    .legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .legend .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    .legend .dot.spy { background: var(--spy); }
+    .legend .dot.strategy { background: var(--strategy); }
+    .legend .dot.vix { background: var(--accent); }
+
+    .chart-hint {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.5rem;
+      margin: 0;
+      font-size: 0.8rem;
+      color: var(--muted);
+      pointer-events: none;
+      line-height: 1.35;
+      text-align: right;
+      max-width: 10em;
+    }
+    .chart-hint.chart-hint-btn {
+      pointer-events: auto;
+      cursor: pointer;
+      color: var(--accent);
+      text-decoration: underline;
+    }
+    .chart-hint.chart-hint-btn:hover {
+      opacity: 0.9;
+    }
+    .chart-hint-below {
+      margin: 0.5rem 0 0;
+      font-size: 0.75rem;
+      color: var(--muted);
+      line-height: 1.4;
+      padding: 0;
+    }
+    .chart-hint-below.chart-hint-btn {
+      cursor: pointer;
+      color: var(--accent);
+      text-decoration: underline;
+    }
+    .btn-reset-zoom {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.45rem 0.85rem;
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--text);
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .btn-reset-zoom:hover {
+      background: var(--surface);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .btn-reset-zoom:disabled,
+    .btn-reset-zoom.btn-disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+
+    /* Backtest config form */
+    .backtest-config {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem 1.5rem;
+      margin-bottom: 2rem;
+    }
+    .backtest-config h2 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin: 0 0 1.25rem;
+      color: var(--text);
+    }
+    .backtest-config-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 1rem 1.25rem;
+      align-items: end;
+      margin-bottom: 1.25rem;
+    }
+    .backtest-config label {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      font-size: 0.75rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .backtest-config select,
+    .backtest-config input[type="number"],
+    .backtest-config input[type="date"] {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      padding: 0.5rem 0.6rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+    }
+    .backtest-config select:focus,
+    .backtest-config input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    .backtest-config .strategy-params {
+      display: none;
+    }
+    .backtest-config .strategy-params.visible {
+      display: block;
+    }
+    .btn-run {
+      background: linear-gradient(135deg, var(--accent) 0%, #06b6d4 100%);
+      color: var(--bg);
+      border: none;
+      padding: 0.65rem 1.4rem;
+      font-size: 0.95rem;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+    .btn-run:hover {
+      opacity: 0.95;
+    }
+    .btn-run:active {
+      transform: scale(0.98);
+    }
+    .btn-run:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .backtest-config .load-msg {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-top: 0.5rem;
+    }
+    .backtest-config .load-msg.error { color: var(--danger); }
+
+    /* Date range */
+    .date-range-section {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.85rem;
+      margin-bottom: 1.25rem;
+      padding: 0.75rem 1rem;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+    }
+    .date-range-section label {
+      font-size: 0.8rem;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .date-range-section input[type="date"] {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text);
+      padding: 0.35rem 0.5rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+    }
+    .date-range-section input[type="date"]:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    /* Position / allocation */
+    .strategy-rules {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-bottom: 0.75rem;
+      line-height: 1.45;
+    }
+    .strategy-rules strong { color: var(--text); }
+    .position-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.78rem;
+      font-weight: 500;
+      padding: 0.28rem 0.55rem;
+      border-radius: 6px;
+      margin-top: 0.35rem;
+      letter-spacing: 0.02em;
+    }
+    .position-indicator.in-market { background: rgba(52, 211, 153, 0.18); color: var(--spy); }
+    .position-indicator.cash { background: rgba(113, 113, 122, 0.25); color: var(--muted); }
+
+    /* Loading / error */
+    .load-state {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: var(--muted);
+    }
+
+    .load-state.error { color: var(--danger); }
+
+    /* Footer */
+    footer {
+      text-align: center;
+      padding: 2rem 1rem;
+      border-top: 1px solid var(--border);
+      margin-top: 3rem;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    footer a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="hero">
+      <h1>Policy<span class="hero-fn"><span class="hero-fn-full">Function</span><span class="hero-fn-math">f(x)</span></span></h1>
+      <p>Test your own strategies: pick a strategy, set dates and parameters, run a backtest, and see results with replay.</p>
+    </header>
+
+    <section class="backtest-config" id="backtest-config">
+      <h2>Backtest setup</h2>
+      <form id="backtest-form" role="form">
+        <div class="backtest-config-grid">
+          <label>
+            Strategy
+            <select id="config-strategy" name="strategy">
+              <option value="sma200">SMA 200 — Long when close &gt; 200d SMA</option>
+              <option value="sma50">SMA 50 — Long when close &gt; 50d SMA</option>
+              <option value="vix">VIX — Buy SPY when VIX above threshold</option>
+            </select>
+          </label>
+          <label>
+            Start date
+            <input type="date" id="config-start" name="start" required />
+          </label>
+          <label>
+            End date
+            <input type="date" id="config-end" name="end" required />
+          </label>
+          <label>
+            Initial capital ($)
+            <input type="number" id="config-capital" name="capital" min="100" value="10000" step="100" />
+          </label>
+          <div class="strategy-params visible" id="params-sma">
+            <label>
+              SMA period
+              <input type="number" id="config-sma-period" name="sma_period" min="2" value="200" />
+            </label>
+          </div>
+          <div class="strategy-params" id="params-vix">
+            <label>
+              VIX threshold
+              <input type="number" id="config-vix-threshold" name="vix_threshold" min="10" value="30" />
+            </label>
+            <label>
+              Buy $/day when above
+              <input type="number" id="config-buy-dollars" name="buy_dollars" min="1" value="1000" />
+            </label>
+          </div>
+        </div>
+        <button type="submit" class="btn-run" id="btn-run-backtest">Run backtest</button>
+        <p class="load-msg" id="backtest-msg" aria-live="polite"></p>
+      </form>
+    </section>
+
+    <main class="strategies">
+      <article class="strategy-card strategy-card-single expanded" id="sma200-strategy" data-strategy="sma200">
+        <div class="strategy-header" role="button" tabindex="0" aria-expanded="true" aria-controls="sma200-body" id="sma200-header">
+          <div class="strategy-title">
+            Backtest results
+            <span class="badge" id="sma200-badge">—</span>
+          </div>
+          <div class="strategy-meta" id="sma200-meta">Run a backtest above to see results.</div>
+        </div>
+        <div class="strategy-body" id="sma200-body">
+          <div id="sma200-content">
+            <p class="load-state">Loading backtest…</p>
+          </div>
+        </div>
+      </article>
+    </main>
+
+    <footer>
+      Data from backtest. Not financial advice. Past performance does not guarantee future results.
+    </footer>
+  </div>
+
+  <script>
+    (function () {
+      const DATA_URL = '/backtest_results.json';
+      const REPLAY_MS_PER_POINT = 45;
+
+      // Fallback when fetch fails (no server or missing file)
+      var FALLBACK_PORTFOLIO = [];
+      (function () {
+        var spy = 10000, strat = 10000;
+        for (var i = 0; i < 80; i++) {
+          var d = new Date('2021-02-06');
+          d.setDate(d.getDate() + i * 14);
+          spy *= 0.995 + Math.random() * 0.012;
+          strat *= 0.994 + Math.random() * 0.013;
+          var vix = 14 + Math.random() * 28;
+          var inMarket = vix > 30 ? 1 : 0;
+          FALLBACK_PORTFOLIO.push({ date: d.toISOString().slice(0, 10), spy: Math.round(spy * 100) / 100, strategy: Math.round(strat * 100) / 100, vix: Math.round(vix * 100) / 100, in_market: inMarket });
+        }
+      })();
+      var FALLBACK_DATA = {
+        metrics: { strategy_total_return: -11.56, spy_total_return: -19.76, final_strategy_value: 8844.08, final_spy_value: 8024.06, strategy_max_drawdown: -9.3, strategy_sharpe: 0.29, win_rate: 54.2, days_in_market: 145, days_in_market_pct: 11.5 },
+        config: { start_date: '2021-02-06', end_date: '2024-07-19', initial_capital: 10000, strategy: 'sma200' },
+        charts: { portfolio: FALLBACK_PORTFOLIO }
+      };
+
+      let backtestData = null;
+      let replayIndex = 0;
+      let replayTimer = null;
+      let replaySpeed = REPLAY_MS_PER_POINT;
+      let dateFilterStart = null;
+      let dateFilterEnd = null;
+
+      let sma200Data = null;
+      let sma200ReplayIndex = 0;
+      let sma200ReplayTimer = null;
+      let sma200DateFilterStart = null;
+      let sma200DateFilterEnd = null;
+
+      const container = document.getElementById('vix-content');
+      const loadEl = document.getElementById('vix-load');
+      const metaEl = document.getElementById('vix-meta');
+      const card = document.getElementById('vix-strategy');
+      const header = document.getElementById('vix-header');
+
+      function setLoading(loading) {
+        if (loadEl) {
+          loadEl.style.display = loading ? 'block' : 'none';
+          loadEl.textContent = loading ? 'Loading backtest data…' : '';
+          if (!loading && backtestData) loadEl.classList.remove('load-state');
+        }
+      }
+
+      function setError(msg) {
+        setLoading(false);
+        loadEl.classList.add('load-state', 'error');
+        loadEl.textContent = msg;
+      }
+
+      function formatDate(str) {
+        if (!str) return '—';
+        const d = new Date(str);
+        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      }
+
+      function formatDateShort(str) {
+        if (!str) return '';
+        const d = new Date(str);
+        return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+      }
+
+      function formatPct(n) {
+        if (n == null) return '—';
+        const s = n >= 0 ? '+' + n.toFixed(2) : n.toFixed(2);
+        return s + '%';
+      }
+
+      function formatMoney(n) {
+        if (n == null) return '—';
+        return '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      }
+
+      function computeMetricsAsOf(portfolioSlice, vixBuy, vixSell) {
+        if (!portfolioSlice || portfolioSlice.length === 0) return null;
+        const v = portfolioSlice;
+        const first = v[0];
+        const last = v[v.length - 1];
+        const strategyTotalReturn = ((last.strategy / first.strategy) - 1) * 100;
+        const spyTotalReturn = ((last.spy / first.spy) - 1) * 100;
+        let peak = first.strategy;
+        let maxDrawdown = 0;
+        for (let i = 0; i < v.length; i++) {
+          if (v[i].strategy > peak) peak = v[i].strategy;
+          const dd = ((v[i].strategy - peak) / peak) * 100;
+          if (dd < maxDrawdown) maxDrawdown = dd;
+        }
+        const thr = vixBuy != null ? vixBuy : 30;
+        const strategyReturns = v.map((p, i) => i === 0 ? 0 : (p.strategy - v[i - 1].strategy) / v[i - 1].strategy);
+        const mean = strategyReturns.reduce((a, b) => a + b, 0) / strategyReturns.length;
+        const variance = strategyReturns.reduce((a, r) => a + (r - mean) * (r - mean), 0) / strategyReturns.length;
+        const std = Math.sqrt(variance) || 1e-10;
+        const sharpe = (mean / std) * Math.sqrt(252);
+        var inMarket = function (p) { return p.in_market === 1 || p.in_market === true || (p.in_market == null && p.vix != null && p.vix > thr); };
+        let daysInMarketCount = 0;
+        let wins = 0;
+        for (let i = 1; i < v.length; i++) {
+          if (inMarket(v[i])) {
+            daysInMarketCount++;
+            if (v[i].spy > v[i - 1].spy) wins++;
+          }
+        }
+        const winRate = daysInMarketCount > 0 ? (wins / daysInMarketCount) * 100 : 0;
+        const daysInMarket = v.filter(inMarket).length;
+        const daysInMarketPct = v.length > 0 ? (daysInMarket / v.length) * 100 : 0;
+        return {
+          strategy_total_return: strategyTotalReturn,
+          spy_total_return: spyTotalReturn,
+          final_strategy_value: last.strategy,
+          final_spy_value: last.spy,
+          strategy_max_drawdown: maxDrawdown,
+          strategy_sharpe: sharpe,
+          win_rate: winRate,
+          days_in_market: daysInMarket,
+          days_in_market_pct: daysInMarketPct
+        };
+      }
+
+      function updateMetricsDOM(m, idPrefix) {
+        if (!m) return;
+        var pre = idPrefix || '';
+        const set = function (id, text, extraClass) {
+          const el = document.getElementById(pre + id);
+          if (el) {
+            el.textContent = text;
+            el.className = 'metric-value' + (extraClass ? ' ' + extraClass : '');
+          }
+        };
+        set('metric-strategy-return', formatPct(m.strategy_total_return), (m.strategy_total_return || 0) >= 0 ? 'positive' : 'negative');
+        set('metric-spy-return', formatPct(m.spy_total_return), (m.spy_total_return || 0) >= 0 ? 'positive' : 'negative');
+        set('metric-final-strategy', formatMoney(m.final_strategy_value));
+        set('metric-final-spy', formatMoney(m.final_spy_value));
+        set('metric-max-dd', formatPct(m.strategy_max_drawdown), 'negative');
+        set('metric-sharpe', m.strategy_sharpe != null ? m.strategy_sharpe.toFixed(2) : '—');
+        set('metric-win-rate', m.win_rate != null ? m.win_rate.toFixed(1) + '%' : '—');
+        set('metric-days-market', (m.days_in_market ?? '—') + ' (' + (m.days_in_market_pct ?? 0).toFixed(1) + '%)');
+      }
+
+      function renderMetrics(metrics) {
+        if (!metrics) return '';
+        const m = metrics;
+        return `
+          <div class="metrics-grid">
+            <div class="metric">
+              <div class="metric-label">Strategy return</div>
+              <div class="metric-value" id="metric-strategy-return">${formatPct(m.strategy_total_return)}</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">SPY return</div>
+              <div class="metric-value" id="metric-spy-return">${formatPct(m.spy_total_return)}</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">Value (strategy)</div>
+              <div class="metric-value" id="metric-final-strategy">${formatMoney(m.final_strategy_value)}</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">Value (SPY)</div>
+              <div class="metric-value" id="metric-final-spy">${formatMoney(m.final_spy_value)}</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">Max drawdown</div>
+              <div class="metric-value negative" id="metric-max-dd">${formatPct(m.strategy_max_drawdown)}</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">Sharpe</div>
+              <div class="metric-value" id="metric-sharpe">${(m.strategy_sharpe != null ? m.strategy_sharpe.toFixed(2) : '—')}</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">Win rate</div>
+              <div class="metric-value" id="metric-win-rate">${(m.win_rate != null ? m.win_rate.toFixed(1) : '—')}%</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">Days in market</div>
+              <div class="metric-value" id="metric-days-market">${m.days_in_market ?? '—'} (${(m.days_in_market_pct ?? 0).toFixed(1)}%)</div>
+            </div>
+          </div>
+        `;
+      }
+
+      function buildReplayControls(totalPoints, currentIndex, currentDate) {
+        const isPlaying = replayTimer != null;
+        return `
+          <div class="replay-section">
+            <div class="replay-label">Historical replay</div>
+            <div class="replay-controls">
+              <button type="button" class="replay-btn js-replay-play" id="replay-play" title="${isPlaying ? 'Pause' : 'Play'}">${isPlaying ? '⏸' : '▶'}</button>
+              <button type="button" class="replay-btn js-replay-restart" id="replay-restart" title="Restart">⏮</button>
+              <div class="replay-slider-wrap">
+                <input type="range" class="replay-slider" id="replay-slider" min="0" max="${Math.max(0, totalPoints - 1)}" value="${currentIndex}" />
+              </div>
+              <span class="replay-date" id="replay-date">${formatDate(currentDate)}</span>
+            </div>
+          </div>
+        `;
+      }
+
+      function getVisibleData(portfolio, drawdown, upToIndex) {
+        const i = Math.min(upToIndex, (portfolio && portfolio.length) ? portfolio.length - 1 : 0);
+        return {
+          portfolio: (portfolio || []).slice(0, i + 1),
+          drawdown: (drawdown || []).slice(0, i + 1),
+          date: portfolio && portfolio[i] ? portfolio[i].date : null
+        };
+      }
+
+      function updateXAxis(visiblePortfolio, prefix, yPos) {
+        const padLeft = 50;
+        const padRight = 20;
+        const chartW = 600 - padLeft - padRight;
+        const n = visiblePortfolio.length;
+        const indices = n <= 1 ? [0] : [0, Math.floor((n - 1) * 0.25), Math.floor((n - 1) * 0.5), Math.floor((n - 1) * 0.75), n - 1];
+        for (let j = 0; j < 5; j++) {
+          const el = document.getElementById(prefix + '-x-' + j);
+          if (!el) continue;
+          if (j < indices.length && visiblePortfolio[indices[j]]) {
+            const i = indices[j];
+            el.setAttribute('x', String(padLeft + (n > 1 ? (i / (n - 1)) * chartW : 0)));
+            el.setAttribute('y', String(yPos));
+            el.textContent = formatDateShort(visiblePortfolio[indices[j]].date);
+            el.style.visibility = 'visible';
+          } else {
+            el.textContent = '';
+            el.style.visibility = 'hidden';
+          }
+        }
+      }
+
+      function updateYAxisPortfolio(visiblePortfolio) {
+        if (!visiblePortfolio.length) return;
+        const vals = visiblePortfolio.map(function (p) { return Math.min(p.spy, p.strategy); }).concat(visiblePortfolio.map(function (p) { return Math.max(p.spy, p.strategy); }));
+        const minV = Math.min.apply(null, vals);
+        const maxV = Math.max.apply(null, vals);
+        const mid = (minV + maxV) / 2;
+        const el0 = document.getElementById('portfolio-y-0');
+        const el1 = document.getElementById('portfolio-y-1');
+        const el2 = document.getElementById('portfolio-y-2');
+        if (el0) el0.textContent = formatMoney(minV);
+        if (el1) el1.textContent = formatMoney(mid);
+        if (el2) el2.textContent = formatMoney(maxV);
+      }
+
+      function updateYAxisVix(visiblePortfolio) {
+        updateYAxisSecondChart(visiblePortfolio, 'vix');
+      }
+
+      function updateYAxisSecondChart(visiblePortfolio, key) {
+        if (!visiblePortfolio.length) return;
+        const vals = visiblePortfolio.map(function (p) { return p[key]; });
+        const minV = Math.min.apply(null, vals);
+        const maxV = Math.max.apply(null, vals);
+        const mid = (minV + maxV) / 2;
+        const el0 = document.getElementById('vix-y-0');
+        const el1 = document.getElementById('vix-y-1');
+        const el2 = document.getElementById('vix-y-2');
+        const fmt = (key === 'spy_pct_from_ath') ? function (n) { return n.toFixed(1) + '%'; } : function (n) { return n.toFixed(0); };
+        if (el0) el0.textContent = fmt(minV);
+        if (el1) el1.textContent = fmt(mid);
+        if (el2) el2.textContent = fmt(maxV);
+      }
+
+      function pointsFromData(data, key, opts) {
+        const pad = opts.pad || { left: 50, right: 20, top: 20, bottom: 30 };
+        const w = (opts.width || 600) - pad.left - pad.right;
+        const h = (opts.height || 280) - pad.top - pad.bottom;
+        if (!data.length) return '';
+        const vals = data.map(d => d[key]);
+        const min = opts.yMin != null && opts.yMax != null ? opts.yMin : Math.min.apply(null, vals);
+        const max = opts.yMin != null && opts.yMax != null ? opts.yMax : Math.max.apply(null, vals);
+        const range = max - min || 1;
+        return data.map((d, i) => {
+          const x = pad.left + (data.length > 1 ? (i / (data.length - 1)) * w : 0);
+          const y = pad.top + h - ((d[key] - min) / range) * h;
+          return x + ',' + y;
+        }).join(' ');
+      }
+
+      function updateCharts(upToIndex) {
+        try {
+          const portfolio = getFilteredPortfolio();
+          if (!portfolio.length) return;
+          const { portfolio: visiblePortfolio, date } = getVisibleData(portfolio, null, upToIndex);
+
+          if (visiblePortfolio.length) {
+            const spyLine = document.getElementById('portfolio-spy-line');
+            const stratLine = document.getElementById('portfolio-strategy-line');
+            const portfolioVals = visiblePortfolio.flatMap(function (p) { return [p.spy, p.strategy]; });
+            const yMinP = Math.min.apply(null, portfolioVals);
+            const yMaxP = Math.max.apply(null, portfolioVals);
+            const chartOpts = { width: 600, height: 280, yMin: yMinP, yMax: yMaxP };
+            if (spyLine) spyLine.setAttribute('points', pointsFromData(visiblePortfolio, 'spy', chartOpts));
+            if (stratLine) stratLine.setAttribute('points', pointsFromData(visiblePortfolio, 'strategy', chartOpts));
+            updateXAxis(visiblePortfolio, 'portfolio', 268);
+            updateYAxisPortfolio(visiblePortfolio);
+
+            const vixLine = document.getElementById('vix-line');
+            const p0 = visiblePortfolio[0];
+            const secondKey = (backtestData.config && backtestData.config.strategy === 'vix') ? 'vix' : (p0.spy_pct_from_ath != null ? 'spy_pct_from_ath' : 'vix');
+            if (vixLine) vixLine.setAttribute('points', pointsFromData(visiblePortfolio, secondKey, { width: 600, height: 220 }));
+            updateXAxis(visiblePortfolio, 'vix', 208);
+            updateYAxisSecondChart(visiblePortfolio, secondKey);
+            const secondTitle = document.getElementById('chart-second-title');
+            const secondLegend = document.getElementById('chart-second-legend');
+            if (secondTitle) secondTitle.textContent = secondKey === 'spy_pct_from_ath' ? 'SPY % from all-time high' : 'VIX level';
+            if (secondLegend) secondLegend.textContent = secondKey === 'spy_pct_from_ath' ? 'SPY % from ATH' : 'VIX';
+          }
+
+          const dateEl = document.getElementById('replay-date');
+          if (dateEl) dateEl.textContent = formatDate(date);
+
+          const slider = document.getElementById('replay-slider');
+          if (slider) slider.value = upToIndex;
+
+          const currentPoint = portfolio[Math.min(upToIndex, portfolio.length - 1)];
+          const inMarket = currentPoint && (currentPoint.in_market === 1 || currentPoint.in_market === true);
+          const posEl = document.getElementById('position-indicator');
+          if (posEl) {
+            posEl.textContent = inMarket ? 'In market (100% SPY)' : 'In cash (0% SPY)';
+            posEl.className = 'position-indicator ' + (inMarket ? 'in-market' : 'cash');
+          }
+
+          const asOfMetrics = computeMetricsAsOf(visiblePortfolio, null, null);
+          updateMetricsDOM(asOfMetrics);
+          const asOfLabel = document.getElementById('metrics-as-of');
+          if (asOfLabel) asOfLabel.textContent = 'As of ' + formatDate(date);
+        } catch (err) {
+          console.warn('updateCharts', err);
+        }
+      }
+
+      function startReplay() {
+        const portfolio = getFilteredPortfolio();
+        const total = portfolio.length;
+        if (total === 0) return;
+        if (replayTimer) return;
+        if (replayIndex >= total - 1) replayIndex = 0;
+
+        const playBtn = document.getElementById('replay-play');
+        if (playBtn) playBtn.textContent = '⏸';
+
+        function tick() {
+          replayIndex++;
+          const portfolio2 = getFilteredPortfolio();
+          const total2 = portfolio2.length;
+          if (replayIndex >= total2) {
+            replayIndex = total2 - 1;
+            stopReplay();
+            return;
+          }
+          updateCharts(replayIndex);
+        }
+
+        tick(); // advance one frame immediately so user sees response
+        replayTimer = setInterval(tick, replaySpeed);
+      }
+
+      function stopReplay() {
+        if (replayTimer) {
+          clearInterval(replayTimer);
+          replayTimer = null;
+        }
+        const playBtn = document.getElementById('replay-play');
+        if (playBtn) playBtn.textContent = '▶';
+      }
+
+      function restartReplay() {
+        stopReplay();
+        replayIndex = 0;
+        updateCharts(0);
+      }
+
+      function attachReplayListeners(totalPoints) {
+        const playBtn = document.getElementById('replay-play');
+        const restartBtn = document.getElementById('replay-restart');
+        const slider = document.getElementById('replay-slider');
+        const replaySection = document.querySelector('.replay-section');
+
+        function stopPropagation(e) {
+          e.stopPropagation();
+        }
+
+        if (playBtn) {
+          playBtn.onclick = (e) => {
+            stopPropagation(e);
+            if (replayTimer) stopReplay();
+            else startReplay();
+          };
+        }
+        if (restartBtn) {
+          restartBtn.onclick = (e) => {
+            stopPropagation(e);
+            restartReplay();
+          };
+        }
+        if (slider) {
+          slider.oninput = () => {
+            stopReplay();
+            replayIndex = parseInt(slider.value, 10);
+            updateCharts(replayIndex);
+          };
+          slider.onclick = stopPropagation;
+        }
+        if (replaySection) replaySection.onclick = stopPropagation;
+      }
+
+      function attachPortfolioZoomListeners(filtered) {
+        var layer = document.getElementById('portfolio-zoom-layer');
+        var box = document.getElementById('portfolio-zoom-box');
+        var svg = document.getElementById('chart-portfolio');
+        if (!layer || !box || !svg || !filtered || filtered.length < 2) return;
+
+        var xMin = 50, xMax = 580, yMin = 20, yMax = 250;
+        var n = filtered.length;
+
+        function clientToSvg(clientX, clientY) {
+          var pt = svg.createSVGPoint();
+          pt.x = clientX;
+          pt.y = clientY;
+          return pt.matrixTransform(svg.getScreenCTM().inverse());
+        }
+
+        var startX = null, startY = null;
+
+        function clampToChart(clientX, clientY) {
+          var pt = clientToSvg(clientX, clientY);
+          return {
+            x: Math.max(xMin, Math.min(xMax, pt.x)),
+            y: Math.max(yMin, Math.min(yMax, pt.y))
+          };
+        }
+
+        function updateBox(clientX, clientY) {
+          if (startX == null) return;
+          var p = clampToChart(clientX, clientY);
+          var left = Math.min(startX, p.x);
+          var top = Math.min(startY, p.y);
+          var w = Math.abs(p.x - startX);
+          var h = Math.abs(p.y - startY);
+          box.setAttribute('x', left);
+          box.setAttribute('y', top);
+          box.setAttribute('width', w);
+          box.setAttribute('height', h);
+        }
+
+        function finishZoom(clientX, clientY) {
+          if (startX == null) return;
+          var p = clampToChart(clientX, clientY);
+          var x1 = startX;
+          var x2 = p.x;
+          startX = null;
+          startY = null;
+          box.style.display = 'none';
+          box.setAttribute('width', 0);
+          box.setAttribute('height', 0);
+
+          var left = Math.min(x1, x2);
+          var right = Math.max(x1, x2);
+          if (right - left < 10) return;
+
+          var t0 = (left - xMin) / (xMax - xMin);
+          var t1 = (right - xMin) / (xMax - xMin);
+          var i0 = Math.max(0, Math.floor(t0 * (n - 1)));
+          var i1 = Math.min(n - 1, Math.ceil(t1 * (n - 1)));
+          if (i0 >= i1) return;
+
+          dateFilterStart = filtered[i0].date;
+          dateFilterEnd = filtered[i1].date;
+          renderStrategy();
+        }
+
+        function onDocMouseMove(e) {
+          updateBox(e.clientX, e.clientY);
+        }
+        function onDocMouseUp(e) {
+          document.removeEventListener('mousemove', onDocMouseMove);
+          document.removeEventListener('mouseup', onDocMouseUp);
+          finishZoom(e.clientX, e.clientY);
+        }
+
+        layer.addEventListener('mousedown', function (e) {
+          var pt = clientToSvg(e.clientX, e.clientY);
+          startX = Math.max(xMin, Math.min(xMax, pt.x));
+          startY = Math.max(yMin, Math.min(yMax, pt.y));
+          box.setAttribute('x', startX);
+          box.setAttribute('y', startY);
+          box.setAttribute('width', 0);
+          box.setAttribute('height', 0);
+          box.style.display = 'block';
+          document.addEventListener('mousemove', onDocMouseMove);
+          document.addEventListener('mouseup', onDocMouseUp);
+        });
+
+        layer.addEventListener('mousemove', function (e) {
+          updateBox(e.clientX, e.clientY);
+        });
+
+        layer.addEventListener('mouseup', function (e) {
+          e.preventDefault();
+          document.removeEventListener('mousemove', onDocMouseMove);
+          document.removeEventListener('mouseup', onDocMouseUp);
+          finishZoom(e.clientX, e.clientY);
+        });
+
+      }
+
+      function getFilteredPortfolio() {
+        const full = backtestData && backtestData.charts && backtestData.charts.portfolio ? backtestData.charts.portfolio : [];
+        if (!full.length) return [];
+        if (!dateFilterStart) dateFilterStart = full[0].date;
+        if (!dateFilterEnd) dateFilterEnd = full[full.length - 1].date;
+        const filtered = full.filter(function (p) {
+          return p.date >= dateFilterStart && p.date <= dateFilterEnd;
+        });
+        return filtered.length ? filtered : full;
+      }
+
+      var DISPLAY_START_CAPITAL = 10000;
+
+      function getFilteredPortfolioSma200() {
+        const full = sma200Data && sma200Data.charts && sma200Data.charts.portfolio ? sma200Data.charts.portfolio : [];
+        if (!full.length) return [];
+        if (!sma200DateFilterStart) sma200DateFilterStart = full[0].date;
+        if (!sma200DateFilterEnd) sma200DateFilterEnd = full[full.length - 1].date;
+        const filtered = full.filter(function (p) {
+          return p.date >= sma200DateFilterStart && p.date <= sma200DateFilterEnd;
+        });
+        return filtered.length ? filtered : full;
+      }
+
+      function getDisplayPortfolioSma200() {
+        var raw = getFilteredPortfolioSma200();
+        if (!raw.length) return [];
+        var first = raw[0];
+        var scaleSpy = first.spy ? DISPLAY_START_CAPITAL / first.spy : 1;
+        var scaleStrategy = first.strategy ? DISPLAY_START_CAPITAL / first.strategy : 1;
+        return raw.map(function (p) {
+          return {
+            date: p.date,
+            spy: p.spy != null ? p.spy * scaleSpy : p.spy,
+            strategy: p.strategy != null ? p.strategy * scaleStrategy : p.strategy,
+            vix: p.vix,
+            in_market: p.in_market,
+            spy_pct_from_ath: p.spy_pct_from_ath
+          };
+        });
+      }
+
+      function renderStrategy() {
+        var target = document.getElementById('vix-content');
+        if (!target) return;
+        if (!backtestData || !backtestData.charts || !backtestData.charts.portfolio || !backtestData.charts.portfolio.length) {
+          target.innerHTML = '<p class="load-state error">No backtest data. Run ./run.sh then refresh.</p>';
+          return;
+        }
+        var cfg = backtestData.config || {};
+        var metrics = backtestData.metrics || {};
+        var portfolio = getFilteredPortfolio();
+        var totalPoints = portfolio.length;
+        if (totalPoints === 0) {
+          target.innerHTML = '<p class="load-state">No data for the selected date range. Choose different dates.</p>';
+          return;
+        }
+        replayIndex = Math.min(replayIndex, totalPoints - 1);
+        if (replayIndex < 0) replayIndex = 0;
+
+        var currentDate = portfolio[replayIndex] ? portfolio[replayIndex].date : cfg.start_date;
+        var fullPortfolio = backtestData.charts.portfolio || [];
+        var firstDate = fullPortfolio[0] ? fullPortfolio[0].date : '';
+        var lastDate = fullPortfolio.length ? fullPortfolio[fullPortfolio.length - 1].date : '';
+        var currentPoint = portfolio[replayIndex];
+        var inMarket = currentPoint && (currentPoint.in_market === 1 || currentPoint.in_market === true);
+        var initialSlice = portfolio.slice(0, replayIndex + 1);
+        var displayMetrics = initialSlice.length ? (computeMetricsAsOf(initialSlice, null, null) || metrics) : metrics;
+        var ruleText = '<strong>Rule:</strong> Start with $' + (cfg.initial_capital || 10000).toLocaleString() + '. Buy $' + ((cfg.buy_dollars != null ? cfg.buy_dollars : 1000)).toLocaleString() + ' of SPY every day VIX is above 30. No selling.';
+
+        target.innerHTML = `
+          <p class="replay-label" id="metrics-as-of">As of ${formatDate(currentDate)}</p>
+          ${renderMetrics(displayMetrics)}
+          <p class="strategy-rules">${ruleText}</p>
+          <div id="position-indicator" class="position-indicator ${inMarket ? 'in-market' : 'cash'}">
+            ${inMarket ? 'In market (100% SPY)' : 'In cash (0% SPY)'}
+          </div>
+          <div class="date-range-section">
+            <label>From <input type="date" id="date-start" value="${dateFilterStart || firstDate}" min="${firstDate}" max="${lastDate}" /></label>
+            <label>To <input type="date" id="date-end" value="${dateFilterEnd || lastDate}" min="${firstDate}" max="${lastDate}" /></label>
+          </div>
+          ${buildReplayControls(totalPoints, replayIndex, currentDate)}
+          <div class="chart-grid">
+            <div class="chart-wrap">
+              <h3>Portfolio value (replay)</h3>
+              <div class="legend">
+                <span><span class="dot spy"></span> SPY</span>
+                <span><span class="dot strategy"></span> Strategy</span>
+              </div>
+              <div class="chart-container">
+                <svg id="chart-portfolio" viewBox="0 0 600 280" preserveAspectRatio="xMidYMid meet">
+                  <polyline id="portfolio-spy-line" fill="none" stroke="#34d399" stroke-width="2" stroke-linejoin="round" />
+                  <polyline id="portfolio-strategy-line" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linejoin="round" />
+                  <line class="axis-line" x1="50" y1="250" x2="580" y2="250" />
+                  <line class="axis-line" x1="50" y1="20" x2="50" y2="250" />
+                  <rect id="portfolio-zoom-layer" x="50" y="20" width="530" height="230" fill="transparent" style="cursor: crosshair" />
+                  <rect id="portfolio-zoom-box" x="0" y="0" width="0" height="0" fill="rgba(34,211,238,0.2)" stroke="var(--accent)" stroke-width="1.5" style="pointer-events: none; display: none" />
+                  <text id="portfolio-y-0" class="axis-text y-axis" x="48" y="254"></text>
+                  <text id="portfolio-y-1" class="axis-text y-axis" x="48" y="135"></text>
+                  <text id="portfolio-y-2" class="axis-text y-axis" x="48" y="26"></text>
+                  <text id="portfolio-x-0" class="axis-text" x="50" y="268"></text>
+                  <text id="portfolio-x-1" class="axis-text" x="207" y="268"></text>
+                  <text id="portfolio-x-2" class="axis-text" x="365" y="268"></text>
+                  <text id="portfolio-x-3" class="axis-text" x="522" y="268"></text>
+                  <text id="portfolio-x-4" class="axis-text" x="580" y="268"></text>
+                </svg>
+              </div>
+              <p class="chart-hint-below" id="chart-zoom-hint">Drag on the chart to zoom. Hover for values.</p>
+            </div>
+            <div class="chart-wrap">
+              <h3 id="chart-second-title">VIX level</h3>
+              <div class="legend">
+                <span><span class="dot vix"></span> <span id="chart-second-legend">VIX</span></span>
+              </div>
+              <div class="chart-container chart-container tall">
+                <svg id="chart-vix" viewBox="0 0 600 220" preserveAspectRatio="xMidYMid meet">
+                  <line x1="0" y1="110" x2="600" y2="110" stroke="rgba(255,255,255,0.15)" stroke-width="1" stroke-dasharray="4" />
+                  <polyline id="vix-line" fill="none" stroke="#22d3ee" stroke-width="2" stroke-linejoin="round" />
+                  <line class="axis-line" x1="50" y1="190" x2="580" y2="190" />
+                  <line class="axis-line" x1="50" y1="20" x2="50" y2="190" />
+                  <text id="vix-y-0" class="axis-text y-axis" x="48" y="194"></text>
+                  <text id="vix-y-1" class="axis-text y-axis" x="48" y="105"></text>
+                  <text id="vix-y-2" class="axis-text y-axis" x="48" y="26"></text>
+                  <text id="vix-x-0" class="axis-text" x="50" y="208"></text>
+                  <text id="vix-x-1" class="axis-text" x="207" y="208"></text>
+                  <text id="vix-x-2" class="axis-text" x="365" y="208"></text>
+                  <text id="vix-x-3" class="axis-text" x="522" y="208"></text>
+                  <text id="vix-x-4" class="axis-text" x="580" y="208"></text>
+                </svg>
+              </div>
+            </div>
+          </div>
+        `;
+
+        attachReplayListeners(totalPoints);
+        attachPortfolioZoomListeners(portfolio);
+        var isZoomed = (dateFilterStart != null && dateFilterStart !== firstDate) || (dateFilterEnd != null && dateFilterEnd !== lastDate);
+        var chartZoomHint = document.getElementById('chart-zoom-hint');
+        if (chartZoomHint) {
+          chartZoomHint.textContent = isZoomed ? 'Reset zoom' : 'Drag on the chart to zoom. Hover for values.';
+          chartZoomHint.classList.toggle('chart-hint-btn', isZoomed);
+          chartZoomHint.onclick = isZoomed ? function () {
+            dateFilterStart = null;
+            dateFilterEnd = null;
+            renderStrategy();
+          } : null;
+        }
+        if (metaEl) metaEl.textContent = `${formatDate(dateFilterStart || cfg.start_date)} → ${formatDate(dateFilterEnd || cfg.end_date)}`;
+        updateCharts(replayIndex);
+      }
+
+      function renderStrategySma200() {
+        var target = document.getElementById('sma200-content');
+        if (!target || !sma200Data || !sma200Data.charts || !sma200Data.charts.portfolio || !sma200Data.charts.portfolio.length) {
+          if (target) target.innerHTML = '<p class="load-state">No SMA200 data. Start the server with <code>./run.sh</code> and refresh.</p>';
+          return;
+        }
+        var cfg = sma200Data.config || {};
+        var metrics = sma200Data.metrics || {};
+        var portfolio = getFilteredPortfolioSma200();
+        var displayPortfolio = getDisplayPortfolioSma200();
+        var totalPoints = portfolio.length;
+        if (totalPoints === 0) {
+          target.innerHTML = '<p class="load-state">No data for the selected date range.</p>';
+          return;
+        }
+        sma200ReplayIndex = Math.min(sma200ReplayIndex, totalPoints - 1);
+        if (sma200ReplayIndex < 0) sma200ReplayIndex = 0;
+        var currentDate = portfolio[sma200ReplayIndex] ? portfolio[sma200ReplayIndex].date : cfg.start_date;
+        var fullPortfolio = sma200Data.charts.portfolio || [];
+        var firstDate = fullPortfolio[0] ? fullPortfolio[0].date : '';
+        var lastDate = fullPortfolio.length ? fullPortfolio[fullPortfolio.length - 1].date : '';
+        var currentPoint = portfolio[sma200ReplayIndex];
+        var inMarket = currentPoint && (currentPoint.in_market === 1 || currentPoint.in_market === true);
+        var initialSlice = displayPortfolio.slice(0, sma200ReplayIndex + 1);
+        var displayMetrics = initialSlice.length ? (computeMetricsAsOf(initialSlice, null, null) || metrics) : metrics;
+        var ruleText = (cfg.strategy === 'vix')
+          ? '<strong>Rule:</strong> Start $' + (cfg.initial_capital != null ? Number(cfg.initial_capital).toLocaleString() : '10,000') + '. Buy $' + (cfg.buy_dollars != null ? Number(cfg.buy_dollars).toLocaleString() : '1,000') + ' of SPY every day VIX is above ' + (cfg.vix_threshold != null ? cfg.vix_threshold : 30) + '. No selling.'
+          : '<strong>Rule:</strong> Long SPY when close &gt; ' + (cfg.sma_period || 200) + '-day SMA; otherwise cash. Start $' + (cfg.initial_capital != null ? Number(cfg.initial_capital).toLocaleString() : '10,000') + '.';
+        target.innerHTML = '<p class="replay-label" id="sma200-metrics-as-of">As of ' + formatDate(currentDate) + '</p>' +
+          renderMetrics(displayMetrics).replace(/id="metric-/g, 'id="sma200-metric-') +
+          '<p class="strategy-rules">' + ruleText + '</p>' +
+          '<div id="sma200-position-indicator" class="position-indicator ' + (inMarket ? 'in-market' : 'cash') + '">' + (inMarket ? 'In market (100% SPY)' : 'In cash (0% SPY)') + '</div>' +
+          '<div class="date-range-section">' +
+          '<label>From <input type="date" id="sma200-date-start" value="' + (sma200DateFilterStart || firstDate) + '" min="' + firstDate + '" max="' + lastDate + '" /></label>' +
+          '<label>To <input type="date" id="sma200-date-end" value="' + (sma200DateFilterEnd || lastDate) + '" min="' + firstDate + '" max="' + lastDate + '" /></label>' +
+          '</div>' +
+          '<div class="replay-section">' +
+          '<div class="replay-label">Historical replay</div>' +
+          '<div class="replay-controls">' +
+          '<button type="button" class="replay-btn js-replay-play" id="sma200-replay-play" title="Play">▶</button>' +
+          '<button type="button" class="replay-btn js-replay-restart" id="sma200-replay-restart" title="Restart">⏮</button>' +
+          '<div class="replay-slider-wrap"><input type="range" class="replay-slider" id="sma200-replay-slider" min="0" max="' + Math.max(0, totalPoints - 1) + '" value="' + sma200ReplayIndex + '" /></div>' +
+          '<span class="replay-date" id="sma200-replay-date">' + formatDate(currentDate) + '</span>' +
+          '</div></div>' +
+          '<div class="chart-grid">' +
+          '<div class="chart-wrap"><h3>Portfolio value (replay)</h3>' +
+          '<div class="legend"><span><span class="dot spy"></span> SPY</span> <span><span class="dot strategy"></span> Strategy</span></div>' +
+          '<div class="chart-container">' +
+          '<svg id="sma200-chart-portfolio" viewBox="0 0 600 280" preserveAspectRatio="xMidYMid meet">' +
+          '<polyline id="sma200-portfolio-spy-line" fill="none" stroke="#34d399" stroke-width="2" stroke-linejoin="round" />' +
+          '<polyline id="sma200-portfolio-strategy-line" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linejoin="round" />' +
+          '<line class="axis-line" x1="50" y1="250" x2="580" y2="250" /><line class="axis-line" x1="50" y1="20" x2="50" y2="250" />' +
+          '<rect id="sma200-portfolio-zoom-layer" x="50" y="20" width="530" height="230" fill="transparent" style="cursor: crosshair" />' +
+          '<rect id="sma200-portfolio-zoom-box" x="0" y="0" width="0" height="0" fill="rgba(34,211,238,0.2)" stroke="var(--accent)" stroke-width="1.5" style="pointer-events: none; display: none" />' +
+          '<text id="sma200-portfolio-y-0" class="axis-text y-axis" x="48" y="254"></text><text id="sma200-portfolio-y-1" class="axis-text y-axis" x="48" y="135"></text><text id="sma200-portfolio-y-2" class="axis-text y-axis" x="48" y="26"></text>' +
+          '<text id="sma200-portfolio-x-0" class="axis-text" x="50" y="268"></text><text id="sma200-portfolio-x-1" class="axis-text" x="207" y="268"></text><text id="sma200-portfolio-x-2" class="axis-text" x="365" y="268"></text><text id="sma200-portfolio-x-3" class="axis-text" x="522" y="268"></text><text id="sma200-portfolio-x-4" class="axis-text" x="580" y="268"></text>' +
+          '</svg>' +
+          '<div id="sma200-chart-tooltip-portfolio" class="chart-tooltip"><div class="tooltip-date"></div><div class="tooltip-row"><span>SPY</span><span class="tooltip-val"></span></div><div class="tooltip-row"><span>Strategy</span><span class="tooltip-val"></span></div></div>' +
+          '</div>' +
+          '<p class="chart-hint-below" id="sma200-chart-zoom-hint">Drag on the chart to zoom.<br>Hover for values.</p></div></div>' +
+          '<div class="chart-wrap"><h3 id="sma200-chart-second-title">VIX level</h3>' +
+          '<div class="legend"><span><span class="dot vix"></span> <span id="sma200-chart-second-legend">VIX</span></span></div>' +
+          '<div class="chart-container chart-container tall">' +
+          '<svg id="sma200-chart-vix" viewBox="0 0 600 220" preserveAspectRatio="xMidYMid meet">' +
+          '<line x1="0" y1="110" x2="600" y2="110" stroke="rgba(255,255,255,0.15)" stroke-width="1" stroke-dasharray="4" />' +
+          '<polyline id="sma200-vix-line" fill="none" stroke="#22d3ee" stroke-width="2" stroke-linejoin="round" />' +
+          '<line class="axis-line" x1="50" y1="190" x2="580" y2="190" /><line class="axis-line" x1="50" y1="20" x2="50" y2="190" />' +
+          '<text id="sma200-vix-y-0" class="axis-text y-axis" x="48" y="194"></text><text id="sma200-vix-y-1" class="axis-text y-axis" x="48" y="105"></text><text id="sma200-vix-y-2" class="axis-text y-axis" x="48" y="26"></text>' +
+          '<text id="sma200-vix-x-0" class="axis-text" x="50" y="208"></text><text id="sma200-vix-x-1" class="axis-text" x="207" y="208"></text><text id="sma200-vix-x-2" class="axis-text" x="365" y="208"></text><text id="sma200-vix-x-3" class="axis-text" x="522" y="208"></text><text id="sma200-vix-x-4" class="axis-text" x="580" y="208"></text>' +
+          '<rect id="sma200-vix-hover-layer" x="50" y="20" width="530" height="170" fill="transparent" style="cursor: default" />' +
+          '</svg>' +
+          '<div id="sma200-chart-tooltip-vix" class="chart-tooltip"><div class="tooltip-date"></div><div class="tooltip-row"><span>VIX</span><span class="tooltip-val"></span></div></div>' +
+          '</div></div></div>';
+        attachReplayListenersSma200(totalPoints);
+        attachPortfolioZoomListenersSma200(portfolio);
+        attachChartHoverTooltipSma200();
+        var fullPortfolio = sma200Data.charts.portfolio || [];
+        var firstDate = fullPortfolio[0] ? fullPortfolio[0].date : '';
+        var lastDate = fullPortfolio.length ? fullPortfolio[fullPortfolio.length - 1].date : '';
+        var isZoomedSma200 = (sma200DateFilterStart && sma200DateFilterStart !== firstDate) || (sma200DateFilterEnd && sma200DateFilterEnd !== lastDate);
+        var chartZoomHint = document.getElementById('sma200-chart-zoom-hint');
+        if (chartZoomHint) {
+          chartZoomHint.innerHTML = isZoomedSma200 ? 'Reset zoom' : 'Drag on the chart to zoom.<br>Hover for values.';
+          chartZoomHint.classList.toggle('chart-hint-btn', isZoomedSma200);
+          chartZoomHint.onclick = isZoomedSma200 ? function () {
+            sma200DateFilterStart = fullPortfolio[0] ? fullPortfolio[0].date : null;
+            sma200DateFilterEnd = fullPortfolio.length ? fullPortfolio[fullPortfolio.length - 1].date : null;
+            renderStrategySma200();
+          } : null;
+        }
+        var sma200Meta = document.getElementById('sma200-meta');
+        if (sma200Meta) sma200Meta.textContent = formatDate(sma200DateFilterStart || cfg.start_date) + ' → ' + formatDate(sma200DateFilterEnd || cfg.end_date);
+        updateChartsSma200(sma200ReplayIndex);
+      }
+
+      function updateChartsSma200(upToIndex) {
+        try {
+          var portfolio = getDisplayPortfolioSma200();
+          if (!portfolio.length) return;
+          var visible = portfolio.slice(0, upToIndex + 1);
+          var date = visible.length ? visible[visible.length - 1].date : null;
+          if (visible.length) {
+            var spyLine = document.getElementById('sma200-portfolio-spy-line');
+            var stratLine = document.getElementById('sma200-portfolio-strategy-line');
+            var portfolioVals = visible.flatMap(function (p) { return [p.spy, p.strategy]; });
+            var yMinP = Math.min.apply(null, portfolioVals);
+            var yMaxP = Math.max.apply(null, portfolioVals);
+            var chartOpts = { width: 600, height: 280, yMin: yMinP, yMax: yMaxP };
+            if (spyLine) spyLine.setAttribute('points', pointsFromData(visible, 'spy', chartOpts));
+            if (stratLine) stratLine.setAttribute('points', pointsFromData(visible, 'strategy', chartOpts));
+            var y0 = document.getElementById('sma200-portfolio-y-0');
+            var y1 = document.getElementById('sma200-portfolio-y-1');
+            var y2 = document.getElementById('sma200-portfolio-y-2');
+            if (y0) y0.textContent = formatMoney(yMinP);
+            if (y1) y1.textContent = formatMoney((yMinP + yMaxP) / 2);
+            if (y2) y2.textContent = formatMoney(yMaxP);
+            for (var j = 0; j < 5; j++) {
+              var el = document.getElementById('sma200-portfolio-x-' + j);
+              if (el && visible.length > 1) {
+                var idx = j === 4 ? visible.length - 1 : Math.floor((visible.length - 1) * j * 0.25);
+                el.textContent = formatDateShort(visible[idx].date);
+              }
+            }
+            var vixLine = document.getElementById('sma200-vix-line');
+            if (vixLine) vixLine.setAttribute('points', pointsFromData(visible, 'vix', { width: 600, height: 220 }));
+            var vixVals = visible.map(function (p) { return p.vix; });
+            var vMin = vixVals.length ? Math.min.apply(null, vixVals) : 0;
+            var vMax = vixVals.length ? Math.max.apply(null, vixVals) : 0;
+            var vMid = (vMin + vMax) / 2;
+            var vy0 = document.getElementById('sma200-vix-y-0');
+            var vy1 = document.getElementById('sma200-vix-y-1');
+            var vy2 = document.getElementById('sma200-vix-y-2');
+            if (vy0) vy0.textContent = vMin.toFixed(0);
+            if (vy1) vy1.textContent = vMid.toFixed(0);
+            if (vy2) vy2.textContent = vMax.toFixed(0);
+            for (var j = 0; j < 5; j++) {
+              var el = document.getElementById('sma200-vix-x-' + j);
+              if (el && visible.length > 1) { var idx = j === 4 ? visible.length - 1 : Math.floor((visible.length - 1) * j * 0.25); el.textContent = formatDateShort(visible[idx].date); }
+            }
+          }
+          var dateEl = document.getElementById('sma200-replay-date');
+          if (dateEl) dateEl.textContent = formatDate(date);
+          var slider = document.getElementById('sma200-replay-slider');
+          if (slider) slider.value = upToIndex;
+          var currentPoint = portfolio[Math.min(upToIndex, portfolio.length - 1)];
+          var inMarket = currentPoint && (currentPoint.in_market === 1 || currentPoint.in_market === true);
+          var posEl = document.getElementById('sma200-position-indicator');
+          if (posEl) { posEl.textContent = inMarket ? 'In market (100% SPY)' : 'In cash (0% SPY)'; posEl.className = 'position-indicator ' + (inMarket ? 'in-market' : 'cash'); }
+          var asOfMetrics = computeMetricsAsOf(visible, null, null);
+          updateMetricsDOM(asOfMetrics, 'sma200-');
+          var asOfLabel = document.getElementById('sma200-metrics-as-of');
+          if (asOfLabel) asOfLabel.textContent = 'As of ' + formatDate(date);
+        } catch (err) { console.warn('updateChartsSma200', err); }
+      }
+
+      function startReplaySma200() {
+        var portfolio = getFilteredPortfolioSma200();
+        var total = portfolio.length;
+        if (total === 0) return;
+        if (sma200ReplayTimer) return;
+        if (sma200ReplayIndex >= total - 1) sma200ReplayIndex = 0;
+        var playBtn = document.getElementById('sma200-replay-play');
+        if (playBtn) playBtn.textContent = '⏸';
+        function tick() {
+          sma200ReplayIndex++;
+          var portfolio2 = getFilteredPortfolioSma200();
+          if (sma200ReplayIndex >= portfolio2.length) { sma200ReplayIndex = portfolio2.length - 1; stopReplaySma200(); return; }
+          updateChartsSma200(sma200ReplayIndex);
+        }
+        tick();
+        sma200ReplayTimer = setInterval(tick, replaySpeed);
+      }
+      function stopReplaySma200() {
+        if (sma200ReplayTimer) { clearInterval(sma200ReplayTimer); sma200ReplayTimer = null; }
+        var playBtn = document.getElementById('sma200-replay-play');
+        if (playBtn) playBtn.textContent = '▶';
+      }
+      function restartReplaySma200() {
+        stopReplaySma200();
+        sma200ReplayIndex = 0;
+        renderStrategySma200();
+      }
+      function attachReplayListenersSma200(totalPoints) {
+        var playBtn = document.getElementById('sma200-replay-play');
+        var restartBtn = document.getElementById('sma200-replay-restart');
+        var slider = document.getElementById('sma200-replay-slider');
+        var replaySection = document.getElementById('sma200-content');
+        function stopPropagation(e) { if (e) e.stopPropagation(); }
+        if (playBtn) playBtn.onclick = function (e) { stopPropagation(e); if (sma200ReplayTimer) stopReplaySma200(); else startReplaySma200(); };
+        if (restartBtn) restartBtn.onclick = function (e) { stopPropagation(e); restartReplaySma200(); };
+        if (slider) { slider.oninput = function () { stopReplaySma200(); sma200ReplayIndex = parseInt(slider.value, 10); updateChartsSma200(sma200ReplayIndex); }; slider.onclick = stopPropagation; }
+      }
+      function attachPortfolioZoomListenersSma200(filtered) {
+        var layer = document.getElementById('sma200-portfolio-zoom-layer');
+        var box = document.getElementById('sma200-portfolio-zoom-box');
+        var svg = document.getElementById('sma200-chart-portfolio');
+        if (!layer || !box || !svg || !filtered || filtered.length < 2) return;
+        var xMin = 50, xMax = 580, yMin = 20, yMax = 250;
+        var n = filtered.length;
+        function clientToSvg(cx, cy) { var pt = svg.createSVGPoint(); pt.x = cx; pt.y = cy; return pt.matrixTransform(svg.getScreenCTM().inverse()); }
+        var startX = null, startY = null;
+        function finishZoom(x1, x2) {
+          if (startX == null) return;
+          startX = null; startY = null;
+          box.style.display = 'none';
+          var left = Math.min(x1, x2);
+          var right = Math.max(x1, x2);
+          if (right - left < 10) return;
+          var t0 = (left - xMin) / (xMax - xMin);
+          var t1 = (right - xMin) / (xMax - xMin);
+          var i0 = Math.max(0, Math.floor(t0 * (n - 1)));
+          var i1 = Math.min(n - 1, Math.ceil(t1 * (n - 1)));
+          if (i0 >= i1) return;
+          sma200DateFilterStart = filtered[i0].date;
+          sma200DateFilterEnd = filtered[i1].date;
+          renderStrategySma200();
+        }
+        layer.addEventListener('mousedown', function (e) {
+          var pt = clientToSvg(e.clientX, e.clientY);
+          startX = Math.max(xMin, Math.min(xMax, pt.x));
+          startY = Math.max(yMin, Math.min(yMax, pt.y));
+          box.setAttribute('x', startX); box.setAttribute('y', startY); box.setAttribute('width', 0); box.setAttribute('height', 0);
+          box.style.display = 'block';
+          function onMove(e2) { var p = clientToSvg(e2.clientX, e2.clientY); p.x = Math.max(xMin, Math.min(xMax, p.x)); p.y = Math.max(yMin, Math.min(yMax, p.y)); var l = Math.min(startX, p.x); var t = Math.min(startY, p.y); box.setAttribute('x', l); box.setAttribute('y', t); box.setAttribute('width', Math.abs(p.x - startX)); box.setAttribute('height', Math.abs(p.y - startY)); }
+          function onUp(e2) { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); var p = clientToSvg(e2.clientX, e2.clientY); finishZoom(startX, Math.max(xMin, Math.min(xMax, p.x))); }
+          document.addEventListener('mousemove', onMove);
+          document.addEventListener('mouseup', onUp);
+        });
+      }
+
+      function attachChartHoverTooltipSma200() {
+        var portfolio = getDisplayPortfolioSma200();
+        if (!portfolio.length) return;
+        var xMin = 50, xMax = 580;
+
+        function showPortfolioTooltip(e) {
+          var layer = document.getElementById('sma200-portfolio-zoom-layer');
+          var svg = document.getElementById('sma200-chart-portfolio');
+          var tooltip = document.getElementById('sma200-chart-tooltip-portfolio');
+          if (!layer || !svg || !tooltip) return;
+          var pt = svg.createSVGPoint();
+          pt.x = e.clientX;
+          pt.y = e.clientY;
+          pt = pt.matrixTransform(svg.getScreenCTM().inverse());
+          var t = (pt.x - xMin) / (xMax - xMin);
+          t = Math.max(0, Math.min(1, t));
+          var idx = Math.round(t * (portfolio.length - 1));
+          idx = Math.max(0, Math.min(idx, portfolio.length - 1));
+          var p = portfolio[idx];
+          if (!p) return;
+          var dateEl = tooltip.querySelector('.tooltip-date');
+          var vals = tooltip.querySelectorAll('.tooltip-val');
+          if (dateEl) dateEl.textContent = formatDate(p.date);
+          if (vals[0]) vals[0].textContent = formatMoney(p.spy);
+          if (vals[1]) vals[1].textContent = formatMoney(p.strategy);
+          tooltip.classList.add('visible');
+          tooltip.style.position = 'fixed';
+          tooltip.style.left = (e.clientX + 14) + 'px';
+          tooltip.style.top = (e.clientY + 14) + 'px';
+        }
+        function hidePortfolioTooltip() {
+          var tooltip = document.getElementById('sma200-chart-tooltip-portfolio');
+          if (tooltip) tooltip.classList.remove('visible');
+        }
+        var layer = document.getElementById('sma200-portfolio-zoom-layer');
+        if (layer) {
+          layer.addEventListener('mousemove', showPortfolioTooltip);
+          layer.addEventListener('mouseleave', hidePortfolioTooltip);
+        }
+
+        function showVixTooltip(e) {
+          var hoverRect = document.getElementById('sma200-vix-hover-layer');
+          var svg = document.getElementById('sma200-chart-vix');
+          var tooltip = document.getElementById('sma200-chart-tooltip-vix');
+          if (!hoverRect || !svg || !tooltip) return;
+          var pt = svg.createSVGPoint();
+          pt.x = e.clientX;
+          pt.y = e.clientY;
+          pt = pt.matrixTransform(svg.getScreenCTM().inverse());
+          var t = (pt.x - xMin) / (xMax - xMin);
+          t = Math.max(0, Math.min(1, t));
+          var idx = Math.round(t * (portfolio.length - 1));
+          idx = Math.max(0, Math.min(idx, portfolio.length - 1));
+          var p = portfolio[idx];
+          if (!p) return;
+          var dateEl = tooltip.querySelector('.tooltip-date');
+          var valEl = tooltip.querySelector('.tooltip-val');
+          if (dateEl) dateEl.textContent = formatDate(p.date);
+          if (valEl) valEl.textContent = (p.vix != null ? p.vix.toFixed(1) : '—');
+          tooltip.classList.add('visible');
+          tooltip.style.position = 'fixed';
+          tooltip.style.left = (e.clientX + 14) + 'px';
+          tooltip.style.top = (e.clientY + 14) + 'px';
+        }
+        function hideVixTooltip() {
+          var tooltip = document.getElementById('sma200-chart-tooltip-vix');
+          if (tooltip) tooltip.classList.remove('visible');
+        }
+        var vixLayer = document.getElementById('sma200-vix-hover-layer');
+        if (vixLayer) {
+          vixLayer.addEventListener('mousemove', showVixTooltip);
+          vixLayer.addEventListener('mouseleave', hideVixTooltip);
+        }
+      }
+
+      function setDefaultDates() {
+        var endEl = document.getElementById('config-end');
+        var startEl = document.getElementById('config-start');
+        if (!endEl || !startEl) return;
+        var end = new Date();
+        var start = new Date(end);
+        start.setFullYear(start.getFullYear() - 5);
+        endEl.value = end.toISOString().slice(0, 10);
+        startEl.value = start.toISOString().slice(0, 10);
+      }
+
+      function setupBacktestForm() {
+        var form = document.getElementById('backtest-form');
+        var strategySelect = document.getElementById('config-strategy');
+        var paramsSma = document.getElementById('params-sma');
+        var paramsVix = document.getElementById('params-vix');
+        function toggleParams() {
+          var s = strategySelect ? strategySelect.value : 'sma200';
+          if (paramsSma) paramsSma.classList.toggle('visible', s === 'sma200' || s === 'sma50');
+          if (paramsVix) paramsVix.classList.toggle('visible', s === 'vix');
+          var periodInput = document.getElementById('config-sma-period');
+          if (periodInput) periodInput.value = s === 'sma50' ? 50 : 200;
+        }
+        if (strategySelect) strategySelect.addEventListener('change', toggleParams);
+        toggleParams();
+        if (form) form.addEventListener('submit', function (e) { e.preventDefault(); runBacktestFromForm(); });
+      }
+
+      function runBacktestFromForm() {
+        var startEl = document.getElementById('config-start');
+        var endEl = document.getElementById('config-end');
+        var strategyEl = document.getElementById('config-strategy');
+        var capitalEl = document.getElementById('config-capital');
+        var smaPeriodEl = document.getElementById('config-sma-period');
+        var vixThresholdEl = document.getElementById('config-vix-threshold');
+        var buyDollarsEl = document.getElementById('config-buy-dollars');
+        var btn = document.getElementById('btn-run-backtest');
+        var msgEl = document.getElementById('backtest-msg');
+        var target = document.getElementById('sma200-content');
+        if (!startEl || !endEl || !strategyEl) return;
+        var start = startEl.value;
+        var end = endEl.value;
+        if (!start || !end) {
+          if (msgEl) { msgEl.textContent = 'Please set start and end dates.'; msgEl.className = 'load-msg error'; }
+          return;
+        }
+        var strategy = strategyEl.value;
+        var capital = capitalEl ? parseInt(capitalEl.value, 10) : 10000;
+        var params = new URLSearchParams({ start: start, end: end, strategy: strategy, capital: String(capital) });
+        if (strategy === 'sma200' || strategy === 'sma50') {
+          if (smaPeriodEl) params.set('sma_period', smaPeriodEl.value);
+        } else if (strategy === 'vix') {
+          if (vixThresholdEl) params.set('vix_threshold', vixThresholdEl.value);
+          if (buyDollarsEl) params.set('buy_dollars', buyDollarsEl.value);
+        }
+        if (btn) { btn.disabled = true; }
+        if (msgEl) { msgEl.textContent = 'Running backtest…'; msgEl.className = 'load-msg'; }
+        if (target) target.innerHTML = '<p class="load-state">Loading backtest…</p>';
+        var query = params.toString();
+        function tryBacktestUrl(base) {
+          return fetch(base + '/backtest?' + query, { cache: 'no-store' }).then(function (r) { return r.text(); }).then(function (text) {
+            if (!text || text.trim().indexOf('<') === 0) return null;
+            try { return JSON.parse(text); } catch (e) { return null; }
+          }).catch(function () { return null; });
+        }
+        var origins = [''].concat(['8080', '8081', '8082'].map(function (p) { return 'http://127.0.0.1:' + p; }));
+        function tryNext(i) {
+          if (i >= origins.length) return Promise.reject(new Error('BACKTEST_API_NOT_FOUND'));
+          var base = origins[i];
+          return tryBacktestUrl(base || (window.location.origin + (window.location.port ? ':' + window.location.port : ''))).then(function (data) {
+            if (data && data.charts && data.charts.portfolio && data.charts.portfolio.length) return data;
+            return tryNext(i + 1);
+          });
+        }
+        tryNext(0)
+          .then(function (data) {
+            if (data && data.error) throw new Error(data.error);
+            if (!data || !data.charts || !data.charts.portfolio || !data.charts.portfolio.length) throw new Error('Invalid backtest data');
+            sma200Data = data;
+            var full = data.charts.portfolio;
+            sma200DateFilterStart = full[0].date;
+            sma200DateFilterEnd = full[full.length - 1].date;
+            sma200ReplayIndex = 0;
+            renderStrategySma200();
+            if (msgEl) { msgEl.textContent = ''; msgEl.className = 'load-msg'; }
+            var meta = document.getElementById('sma200-meta');
+            if (meta && data.config) meta.textContent = formatDate(data.config.start_date) + ' → ' + formatDate(data.config.end_date);
+            var badge = document.getElementById('sma200-badge');
+            if (badge && data.config) badge.textContent = (data.config.strategy || '—') + ' · $' + (data.config.initial_capital != null ? Number(data.config.initial_capital).toLocaleString() : '—');
+          })
+          .catch(function (err) {
+            var msg = err && err.message ? err.message : String(err);
+            if (msg === 'BACKTEST_API_NOT_FOUND') {
+              if (target) target.innerHTML = '<p class="load-state error">Backtest API not found. Run <code>./run.sh</code> in the project folder, then open the app at: <a href="http://127.0.0.1:8080" target="_blank" rel="noopener" style="color: var(--accent);">8080</a>, <a href="http://127.0.0.1:8081" target="_blank" rel="noopener" style="color: var(--accent);">8081</a>, or <a href="http://127.0.0.1:8082" target="_blank" rel="noopener" style="color: var(--accent);">8082</a> (use the URL printed by <code>./run.sh</code>).</p>';
+              if (msgEl) { msgEl.innerHTML = 'Open from project server: <a href="http://127.0.0.1:8080" target="_blank" style="color: var(--accent);">8080</a> · <a href="http://127.0.0.1:8081" target="_blank" style="color: var(--accent);">8081</a> · <a href="http://127.0.0.1:8082" target="_blank" style="color: var(--accent);">8082</a>'; msgEl.className = 'load-msg error'; }
+            } else {
+              if (target) target.innerHTML = '<p class="load-state error">Backtest failed: ' + (msg.replace(/</g, '&lt;').replace(/>/g, '&gt;')) + '</p>';
+              if (msgEl) { msgEl.textContent = msg; msgEl.className = 'load-msg error'; }
+            }
+          })
+          .finally(function () { if (btn) btn.disabled = false; });
+      }
+
+      function initSma200() {
+        var target = document.getElementById('sma200-content');
+        if (!target) return;
+        fetch('/data-sma200', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (data) {
+          if (data && data.error) throw new Error(data.error);
+          if (!data || !data.charts || !data.charts.portfolio || !data.charts.portfolio.length) throw new Error('Invalid SMA200 data');
+          sma200Data = data;
+          var full = data.charts.portfolio;
+          sma200DateFilterStart = full[0].date;
+          sma200DateFilterEnd = full[full.length - 1].date;
+          sma200ReplayIndex = 0;
+          renderStrategySma200();
+          if (data.config && data.config.initial_capital !== 10000) {
+            var stale = document.createElement('p');
+            stale.className = 'load-state';
+            stale.style.marginBottom = '1rem';
+            stale.innerHTML = 'Showing cached data. <strong>Hard refresh (Cmd+Shift+R)</strong> to run backtest with $10k start.';
+            if (target && target.firstChild) target.insertBefore(stale, target.firstChild);
+          }
+        }).catch(function () {
+          if (target) target.innerHTML = '<p class="load-state">SMA200 backtest unavailable. Start the server with <code>./run.sh</code> and refresh.</p>';
+        });
+      }
+
+      function showFallbackWithBanner() {
+        if (container) {
+          var banner = document.createElement('p');
+          banner.className = 'load-state';
+          banner.style.marginBottom = '1rem';
+          banner.innerHTML = 'Using sample data. Run <code>./run.sh</code> in the project folder for full backtest data.';
+          container.insertBefore(banner, container.firstChild);
+        }
+      }
+
+      function init() {
+        var container = document.getElementById('vix-content');
+        if (!container) return;
+        setLoading(true);
+
+        function useData(data) {
+          if (!data || !data.charts || !data.charts.portfolio || !Array.isArray(data.charts.portfolio)) return false;
+          backtestData = data;
+          var full = data.charts.portfolio;
+          dateFilterStart = full[0].date;
+          dateFilterEnd = full[full.length - 1].date;
+          replayIndex = 0;
+          setLoading(false);
+          try {
+            renderStrategy();
+          } catch (e) {
+            console.error(e);
+            showFallbackWithBanner();
+          }
+          return true;
+        }
+
+        function loadFromFile() {
+          return fetch(DATA_URL, { cache: 'no-store' })
+            .then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('Not found')); })
+            .then(function (data) {
+              if (!useData(data)) throw new Error('Invalid data');
+            });
+        }
+
+        fetch('/data', { cache: 'no-store' })
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            if (data && data.error) throw new Error(data.error);
+            if (useData(data)) return;
+            throw new Error('Invalid data');
+          })
+          .catch(function () {
+            return loadFromFile();
+          })
+          .catch(function () {
+            backtestData = FALLBACK_DATA;
+            setLoading(false);
+            showFallbackWithBanner();
+            var full = backtestData.charts && backtestData.charts.portfolio;
+            if (full && full.length) {
+              dateFilterStart = dateFilterStart || full[0].date;
+              dateFilterEnd = dateFilterEnd || full[full.length - 1].date;
+            }
+            try { renderStrategy(); } catch (e) { console.error(e); }
+          });
+      }
+
+      function renderStrategyStudy(data) {
+        var el = document.getElementById('strategy-study-content');
+        if (!el || !data || data.error) {
+          if (el) el.innerHTML = '<p class="load-state">Strategy study unavailable. Start the server with <code>./run.sh</code> and refresh.</p>';
+          return;
+        }
+        var bench = data.bench || {};
+        var rows = (data.full_results || []).slice();
+        var isOos = data.is_oos || [];
+        var rules = data.rules || {};
+        var regimes = data.regimes || {};
+        var weaknesses = data.weaknesses || {};
+        var summary = data.summary || [];
+        var charts = data.charts || {};
+        var chartOpts = { width: 560, height: 160, pad: { left: 40, right: 15, top: 15, bottom: 25 } };
+
+        var html = '<p class="strategy-rules" style="margin-bottom:1rem"><strong>Benchmark:</strong> SPY buy-and-hold. <strong>Costs:</strong> 10 bps round-trip. <strong>In-sample:</strong> 2005–2013. <strong>OOS:</strong> 2014–present.</p>';
+        html += '<h4 style="margin:1rem 0 0.5rem;font-size:1rem">Full-sample results (2005–present)</h4>';
+        html += '<table class="metrics-grid" style="display:table;width:100%;max-width:640px;border-collapse:collapse;margin-bottom:1rem"><thead><tr><th style="text-align:left;padding:0.4rem;border-bottom:1px solid var(--border)">Strategy</th><th style="text-align:right;padding:0.4rem;border-bottom:1px solid var(--border)">CAGR %</th><th style="text-align:right;padding:0.4rem;border-bottom:1px solid var(--border)">Sharpe</th><th style="text-align:right;padding:0.4rem;border-bottom:1px solid var(--border)">Max DD %</th><th style="text-align:right;padding:0.4rem;border-bottom:1px solid var(--border)">Trades</th></tr></thead><tbody>';
+        html += '<tr><td style="padding:0.4rem;border-bottom:1px solid var(--border)"><strong>SPY (buy &amp; hold)</strong></td><td style="text-align:right;padding:0.4rem;border-bottom:1px solid var(--border)">' + (bench.cagr_pct != null ? bench.cagr_pct.toFixed(2) : '—') + '</td><td style="text-align:right;padding:0.4rem;border-bottom:1px solid var(--border)">' + (bench.sharpe != null ? bench.sharpe.toFixed(2) : '—') + '</td><td style="text-align:right;padding:0.4rem;border-bottom:1px solid var(--border)">' + (bench.max_dd_pct != null ? bench.max_dd_pct.toFixed(2) : '—') + '</td><td style="text-align:right;padding:0.4rem;border-bottom:1px solid var(--border)">0</td></tr>';
+        for (var i = 0; i < rows.length; i++) {
+          var r = rows[i];
+          html += '<tr><td style="padding:0.4rem;border-bottom:1px solid var(--border)">' + r.name + '</td><td style="text-align:right;padding:0.4rem;border-bottom:1px solid var(--border)">' + (r.cagr_pct != null ? r.cagr_pct.toFixed(2) : '—') + '</td><td style="text-align:right;padding:0.4rem;border-bottom:1px solid var(--border)">' + (r.sharpe != null ? r.sharpe.toFixed(2) : '—') + '</td><td style="text-align:right;padding:0.4rem;border-bottom:1px solid var(--border)">' + (r.max_dd_pct != null ? r.max_dd_pct.toFixed(2) : '—') + '</td><td style="text-align:right;padding:0.4rem;border-bottom:1px solid var(--border)">' + (r.trades != null ? r.trades : '—') + '</td></tr>';
+        }
+        html += '</tbody></table>';
+        html += '<h4 style="margin:1rem 0 0.5rem;font-size:1rem">In-sample vs out-of-sample</h4>';
+        html += '<table class="metrics-grid" style="display:table;width:100%;max-width:640px;border-collapse:collapse;margin-bottom:1.5rem"><thead><tr><th style="text-align:left;padding:0.4rem;border-bottom:1px solid var(--border)">Strategy</th><th style="text-align:right;padding:0.4rem;border-bottom:1px solid var(--border)">IS CAGR %</th><th style="text-align:right;padding:0.4rem;border-bottom:1px solid var(--border)">IS Sharpe</th><th style="text-align:right;padding:0.4rem;border-bottom:1px solid var(--border)">OOS CAGR %</th><th style="text-align:right;padding:0.4rem;border-bottom:1px solid var(--border)">OOS Sharpe</th></tr></thead><tbody>';
+        for (var j = 0; j < isOos.length; j++) {
+          var row = isOos[j];
+          html += '<tr><td style="padding:0.4rem;border-bottom:1px solid var(--border)">' + row.name + '</td><td style="text-align:right;padding:0.4rem;border-bottom:1px solid var(--border)">' + (row.is_cagr != null ? row.is_cagr.toFixed(2) : '—') + '</td><td style="text-align:right;padding:0.4rem;border-bottom:1px solid var(--border)">' + (row.is_sharpe != null ? row.is_sharpe.toFixed(2) : '—') + '</td><td style="text-align:right;padding:0.4rem;border-bottom:1px solid var(--border)">' + (row.oos_cagr != null ? row.oos_cagr.toFixed(2) : '—') + '</td><td style="text-align:right;padding:0.4rem;border-bottom:1px solid var(--border)">' + (row.oos_sharpe != null ? row.oos_sharpe.toFixed(2) : '—') + '</td></tr>';
+        }
+        html += '</tbody></table>';
+        html += '<h4 style="margin:1rem 0 0.5rem;font-size:1rem">Each strategy</h4>';
+
+        // Dedicated box for SPY (buy & hold) benchmark
+        var dates = charts.dates || [];
+        var spyArr = charts.spy || [];
+        var spyPoints = '';
+        if (dates.length && spyArr.length === dates.length) {
+          var spyChartData = [];
+          for (var di = 0; di < dates.length; di++) spyChartData.push({ date: dates[di], spy: spyArr[di], strategy: spyArr[di] });
+          var spyMin = Math.min.apply(null, spyArr);
+          var spyMax = Math.max.apply(null, spyArr);
+          var spyOpts = { width: chartOpts.width, height: chartOpts.height, pad: chartOpts.pad, yMin: spyMin, yMax: spyMax };
+          spyPoints = pointsFromData(spyChartData, 'spy', spyOpts);
+        }
+        html += '<div class="strategy-study-box strategy-study-box-bench">';
+        html += '<h4>SPY (buy &amp; hold)</h4>';
+        html += '<p class="study-rule">Buy and hold SPY. No timing; 100% invested. Benchmark for comparison.</p>';
+        html += '<div class="strategy-study-metrics">';
+        html += '<span><strong>' + (bench.cagr_pct != null ? bench.cagr_pct.toFixed(2) : '—') + '%</strong> CAGR</span>';
+        html += '<span><strong>' + (bench.sharpe != null ? bench.sharpe.toFixed(2) : '—') + '</strong> Sharpe</span>';
+        html += '<span><strong>' + (bench.max_dd_pct != null ? bench.max_dd_pct.toFixed(2) : '—') + '%</strong> Max DD</span>';
+        html += '<span><strong>0</strong> Trades</span>';
+        html += '</div>';
+        html += '<div class="strategy-study-chart">';
+        html += '<div class="legend"><span><span class="dot spy"></span> SPY</span></div>';
+        html += '<svg viewBox="0 0 560 160" preserveAspectRatio="xMidYMid meet"><polyline fill="none" stroke="#34d399" stroke-width="1.5" stroke-linejoin="round" points="' + spyPoints + '" /></svg>';
+        html += '</div>';
+        html += '</div>';
+
+        for (var ri = 0; ri < rows.length; ri++) {
+          var r = rows[ri];
+          var name = r.name;
+          var rule = rules[name] || '';
+          var stratCurve = charts.strategies && charts.strategies[name];
+          var dates = charts.dates || [];
+          var spyArr = charts.spy || [];
+          var spyPoints = '';
+          var stratPoints = '';
+          if (stratCurve && dates.length && spyArr.length === dates.length && stratCurve.length === dates.length) {
+            var chartData = [];
+            for (var di = 0; di < dates.length; di++) chartData.push({ date: dates[di], spy: spyArr[di], strategy: stratCurve[di] });
+            var allVals = chartData.flatMap(function (p) { return [p.spy, p.strategy]; });
+            var yMin = Math.min.apply(null, allVals);
+            var yMax = Math.max.apply(null, allVals);
+            var opts = { width: chartOpts.width, height: chartOpts.height, pad: chartOpts.pad, yMin: yMin, yMax: yMax };
+            spyPoints = pointsFromData(chartData, 'spy', opts);
+            stratPoints = pointsFromData(chartData, 'strategy', opts);
+          }
+          html += '<div class="strategy-study-box">';
+          html += '<h4>' + name + '</h4>';
+          html += '<p class="study-rule">' + rule + '</p>';
+          html += '<div class="strategy-study-metrics">';
+          html += '<span><strong>' + (r.cagr_pct != null ? r.cagr_pct.toFixed(2) : '—') + '%</strong> CAGR</span>';
+          html += '<span><strong>' + (r.sharpe != null ? r.sharpe.toFixed(2) : '—') + '</strong> Sharpe</span>';
+          html += '<span><strong>' + (r.max_dd_pct != null ? r.max_dd_pct.toFixed(2) : '—') + '%</strong> Max DD</span>';
+          html += '<span><strong>' + (r.trades != null ? r.trades : '—') + '</strong> Trades</span>';
+          html += '</div>';
+          html += '<div class="strategy-study-chart">';
+          html += '<div class="legend"><span><span class="dot spy"></span> SPY</span> <span><span class="dot strategy"></span> Strategy</span></div>';
+          html += '<svg viewBox="0 0 560 160" preserveAspectRatio="xMidYMid meet"><polyline fill="none" stroke="#34d399" stroke-width="1.5" stroke-linejoin="round" points="' + spyPoints + '" /><polyline fill="none" stroke="#a78bfa" stroke-width="1.5" stroke-linejoin="round" points="' + stratPoints + '" /></svg>';
+          html += '</div>';
+          if (weaknesses[name]) html += '<p class="study-rule" style="margin-top:0.75rem;margin-bottom:0"><strong>Weakness:</strong> ' + weaknesses[name] + '</p>';
+          html += '</div>';
+        }
+
+        html += '<h4 style="margin:1.5rem 0 0.5rem;font-size:1rem">Regimes (SPY vs 200d SMA)</h4><ul style="margin:0 0 1rem;padding-left:1.25rem;color:var(--muted);font-size:0.9rem">';
+        for (var reg in regimes) html += '<li><strong style="color:var(--text)">' + reg + ':</strong> SPY cumulative return ≈ ' + regimes[reg] + '% over regime days</li>';
+        html += '</ul>';
+        html += '<h4 style="margin:1rem 0 0.5rem;font-size:1rem">Summary</h4><ul style="margin:0;padding-left:1.25rem;color:var(--muted);font-size:0.9rem">';
+        for (var s = 0; s < summary.length; s++) html += '<li>' + summary[s] + '</li>';
+        html += '</ul>';
+        el.innerHTML = html;
+      }
+
+      function loadStrategyStudy() {
+        var el = document.getElementById('strategy-study-content');
+        if (!el) return;
+        fetch('/strategy-study', { cache: 'no-store' })
+          .then(function (r) { return r.json(); })
+          .then(function (data) { renderStrategyStudy(data); })
+          .catch(function () { if (el) el.innerHTML = '<p class="load-state">Strategy study unavailable. Start the server with <code>./run.sh</code> and refresh.</p>'; });
+      }
+
+      function run() {
+        try {
+          setDefaultDates();
+          setupBacktestForm();
+          runBacktestFromForm();
+          var sma200Header = document.getElementById('sma200-header');
+          var sma200Card = document.getElementById('sma200-strategy');
+          if (sma200Header && sma200Card) {
+            sma200Header.addEventListener('click', function () {
+              sma200Card.classList.toggle('expanded');
+              sma200Header.setAttribute('aria-expanded', sma200Card.classList.contains('expanded'));
+            });
+          }
+        } catch (err) {
+          var c = document.getElementById('sma200-content');
+          if (c) c.innerHTML = '<p class="error-msg">Dashboard error: ' + String(err && err.message ? err.message : err) + '</p>';
+        }
+      }
+
+      // Replay controls: one document-level handler so play always works
+      function findReplayBtn(el) {
+        if (!el) return null;
+        if (el.nodeType !== 1) el = el.parentElement;
+        return el && el.closest ? el.closest('.js-replay-play') : null;
+      }
+      function findRestartBtn(el) {
+        if (!el) return null;
+        if (el.nodeType !== 1) el = el.parentElement;
+        return el && el.closest ? el.closest('.js-replay-restart') : null;
+      }
+      document.body.addEventListener('click', function (e) {
+        var playBtn = findReplayBtn(e.target);
+        var restartBtn = findRestartBtn(e.target);
+        if (playBtn) {
+          e.preventDefault();
+          e.stopPropagation();
+          try {
+            if (sma200ReplayTimer) stopReplaySma200();
+            else startReplaySma200();
+          } catch (err) { console.error('Play failed', err); }
+          return;
+        }
+        if (restartBtn) {
+          e.preventDefault();
+          e.stopPropagation();
+          try { restartReplaySma200(); } catch (err) { console.error('Restart failed', err); }
+        }
+      }, true);
+
+      run();
+
+      document.addEventListener('input', function (e) {
+        if (e.target.id === 'sma200-replay-slider') {
+          stopReplaySma200();
+          sma200ReplayIndex = parseInt(e.target.value, 10);
+          updateChartsSma200(sma200ReplayIndex);
+        }
+        if (e.target.id === 'sma200-date-start') {
+          sma200DateFilterStart = e.target.value;
+          if (sma200DateFilterEnd && sma200DateFilterStart > sma200DateFilterEnd) sma200DateFilterEnd = sma200DateFilterStart;
+          stopReplaySma200();
+          sma200ReplayIndex = 0;
+          renderStrategySma200();
+        }
+        if (e.target.id === 'sma200-date-end') {
+          sma200DateFilterEnd = e.target.value;
+          if (sma200DateFilterStart && sma200DateFilterEnd < sma200DateFilterStart) sma200DateFilterStart = sma200DateFilterEnd;
+          stopReplaySma200();
+          sma200ReplayIndex = 0;
+          renderStrategySma200();
+        }
+      });
+
+      var sma200ContentEl = document.getElementById('sma200-content');
+      if (sma200ContentEl) {
+        sma200ContentEl.addEventListener('click', function (e) {
+          var el = e.target && e.target.nodeType === 1 ? e.target : (e.target && e.target.parentElement) || null;
+          if (el && (el.closest('.replay-section') || el.closest('.chart-wrap') || el.closest('.date-range-section'))) e.stopPropagation();
+        });
+      }
+
+    })();
+  </script>
+</body>
+</html>

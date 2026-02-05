@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+*.egg-info/
+
+# Generated / large
+backtest_results.json
+
+# OS
+.DS_Store
+
+# Vercel
+.vercel/

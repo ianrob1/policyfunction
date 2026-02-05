@@ -1,0 +1,6 @@
+# Large generated file; not needed for serverless backtest
+backtest_results.json
+__pycache__
+*.pyc
+.venv
+.git
