@@ -139,6 +139,20 @@
       max-width: 480px;
       margin: 0 auto 2rem;
     }
+    .hero .hero-tagline {
+      font-size: 1.25rem;
+      color: var(--accent);
+      font-weight: 500;
+      margin-bottom: 0.5rem;
+    }
+    .hero .hero-definition {
+      font-size: 0.9rem;
+      font-style: italic;
+      color: var(--muted);
+      opacity: 0.9;
+      max-width: 520px;
+      margin: 0 auto 2rem;
+    }
 
     /* Strategy cards */
     .strategies {
@@ -777,7 +791,9 @@
   <div class="page">
     <header class="hero">
       <h1>Policy<span class="hero-fn"><span class="hero-fn-full">Function</span><span class="hero-fn-math">f(x)</span></span></h1>
+      <p class="hero-tagline">π(s) — the decision rule mapping state to action.</p>
       <p>Test your own strategies: pick a strategy, set dates and parameters, run a backtest, and see results with replay.</p>
+      <p class="hero-definition">A policy function, denoted π(s), is a fundamental concept in reinforcement learning and optimal control theory that defines the decision-making strategy of an agent.</p>
     </header>
 
     <section class="backtest-config" id="backtest-config">
@@ -1834,6 +1850,19 @@
         start.setFullYear(start.getFullYear() - 5);
         endEl.value = end.toISOString().slice(0, 10);
         startEl.value = start.toISOString().slice(0, 10);
+        syncDateConstraints();
+      }
+
+      function syncDateConstraints() {
+        var startEl = document.getElementById('config-start');
+        var endEl = document.getElementById('config-end');
+        if (!startEl || !endEl) return;
+        var today = new Date().toISOString().slice(0, 10);
+        var startVal = startEl.value;
+        var endVal = endEl.value;
+        startEl.setAttribute('max', endVal || today);
+        endEl.setAttribute('min', startVal || '');
+        endEl.setAttribute('max', today);
       }
 
       function setupBacktestForm() {
@@ -1858,6 +1887,13 @@
         if (strategySelect) strategySelect.addEventListener('change', toggleParams);
         toggleParams();
         if (form) form.addEventListener('submit', function (e) { e.preventDefault(); runBacktestFromForm(); });
+        syncDateConstraints();
+        var startInput = document.getElementById('config-start');
+        var endInput = document.getElementById('config-end');
+        if (startInput) startInput.addEventListener('input', syncDateConstraints);
+        if (startInput) startInput.addEventListener('change', syncDateConstraints);
+        if (endInput) endInput.addEventListener('input', syncDateConstraints);
+        if (endInput) endInput.addEventListener('change', syncDateConstraints);
       }
 
       function runBacktestFromForm() {
@@ -1876,6 +1912,10 @@
         var end = endEl.value;
         if (!start || !end) {
           if (msgEl) { msgEl.textContent = 'Please set start and end dates.'; msgEl.className = 'load-msg error'; }
+          return;
+        }
+        if (start > end) {
+          if (msgEl) { msgEl.textContent = 'Start date must be before end date.'; msgEl.className = 'load-msg error'; }
           return;
         }
         var strategy = strategyEl.value;
