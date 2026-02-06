@@ -102,18 +102,60 @@ def backtest_vix_strategy(df, initial_capital=100000, vix_buy_above=30, buy_doll
 COST_BPS_ROUND_TRIP = 10
 
 
+def _rsi(close_series, period=14):
+    """RSI(period). Returns Series; first (period+1) values are NaN."""
+    delta = close_series.diff()
+    gain = delta.where(delta > 0, 0.0)
+    loss = (-delta).where(delta < 0, 0.0)
+    avg_gain = gain.rolling(period, min_periods=period).mean()
+    avg_loss = loss.rolling(period, min_periods=period).mean()
+    rs = avg_gain / avg_loss.replace(0, np.nan)
+    rsi = 100 - (100 / (1 + rs))
+    rsi = rsi.fillna(100)  # avg_loss=0 -> RSI=100
+    return rsi.fillna(50)  # insufficient data -> neutral
+
+
 def backtest_sma_strategy(df, period=200, initial_capital=10000):
     """
-    Long SPY when close > period-day SMA; otherwise cash.
-    No lookahead: signal at close[t-1] -> position at open[t]. Execution at next open.
-    Frictions: COST_BPS_ROUND_TRIP applied on each position change.
+    Go With the Flow: Long SPY when close > period-day SMA; otherwise cash.
+    Dip-buy: When bearish (Close < SMA50), allocate 50% SPY when RSI(14)<30 or price >10% below SMA50.
+    Exit dip-buy when RSI>50 or price crosses back above SMA50.
+    No lookahead: signals from close[t-1] -> position at open[t]. Frictions applied.
     """
     df = df.copy()
     df['spy_returns'] = df['spy_close'].pct_change().fillna(0)
     sma = df['spy_close'].rolling(period, min_periods=period).mean()
-    # Position at start of day t = signal from end of day t-1 (execute at open[t])
-    signal = (df['spy_close'].shift(1) > sma.shift(1)).astype(int).fillna(0)
-    df['position'] = signal.values
+    sma50 = df['spy_close'].rolling(50, min_periods=50).mean()
+    rsi = _rsi(df['spy_close'], 14)
+    # All signals from prior close (shift 1)
+    cl = df['spy_close'].shift(1)
+    sma_prev = sma.shift(1)
+    sma50_prev = sma50.shift(1)
+    rsi_prev = rsi.shift(1)
+    trend_long = (cl > sma_prev).fillna(False)
+    bearish = (cl < sma50_prev).fillna(False)
+    dip_trigger = bearish & ((rsi_prev < 30) | (cl < 0.9 * sma50_prev))
+    dip_exit = (rsi_prev > 50) | (cl > sma50_prev)
+    # State machine: in_dip_buy at start of day t
+    in_dip = []
+    for i in range(len(df)):
+        if i == 0:
+            in_dip.append(False)
+            continue
+        was_dip = in_dip[-1]
+        if trend_long.iloc[i]:
+            in_dip.append(False)
+        elif was_dip and dip_exit.iloc[i]:
+            in_dip.append(False)
+        elif dip_trigger.iloc[i]:
+            in_dip.append(True)
+        elif was_dip:
+            in_dip.append(True)
+        else:
+            in_dip.append(False)
+    # Position: 1.0 = 100% SPY, 0.5 = 50% dip-buy, 0.0 = cash
+    position = np.where(trend_long.values, 1.0, np.where(in_dip, 0.5, 0.0))
+    df['position'] = position.astype(float)
 
     strategy_values = [float(initial_capital)]
     for i in range(1, len(df)):
@@ -144,15 +186,44 @@ def backtest_sma200_strategy(df, initial_capital=10000):
 
 def backtest_sma50_200_tbill(df, initial_capital=10000, tbill_annual_rate=0.04):
     """
-    Long SPY if Close > SMA(50) AND SMA(50) > SMA(200); otherwise T-bills.
+    Stay In or Step Out: Long SPY if Close > SMA(50) and SMA(50) > SMA(200); otherwise T-bills.
+    Dip-buy: When bearish (Close < SMA50), allocate 50% SPY when RSI(14)<30 or price >10% below SMA50.
+    Exit dip-buy when RSI>50 or price crosses back above SMA50.
     No lookahead: signal at close[t-1] -> position at open[t]. Frictions applied.
     """
     df = df.copy()
     df['spy_returns'] = df['spy_close'].pct_change().fillna(0)
     sma50 = df['spy_close'].rolling(50, min_periods=50).mean()
     sma200 = df['spy_close'].rolling(200, min_periods=200).mean()
-    signal = ((df['spy_close'].shift(1) > sma50.shift(1)) & (sma50.shift(1) > sma200.shift(1))).astype(int).fillna(0)
-    df['position'] = signal.values
+    rsi = _rsi(df['spy_close'], 14)
+    cl = df['spy_close'].shift(1)
+    sma50_prev = sma50.shift(1)
+    sma200_prev = sma200.shift(1)
+    rsi_prev = rsi.shift(1)
+    trend_long = (cl > sma50_prev) & (sma50_prev > sma200_prev)
+    trend_long = trend_long.fillna(False)
+    bearish = (cl < sma50_prev).fillna(False)
+    dip_trigger = bearish & ((rsi_prev < 30) | (cl < 0.9 * sma50_prev))
+    dip_exit = (rsi_prev > 50) | (cl > sma50_prev)
+    in_dip = []
+    for i in range(len(df)):
+        if i == 0:
+            in_dip.append(False)
+            continue
+        was_dip = in_dip[-1]
+        if trend_long.iloc[i]:
+            in_dip.append(False)
+        elif was_dip and dip_exit.iloc[i]:
+            in_dip.append(False)
+        elif dip_trigger.iloc[i]:
+            in_dip.append(True)
+        elif was_dip:
+            in_dip.append(True)
+        else:
+            in_dip.append(False)
+    # Position: 1.0 = 100% SPY, 0.5 = 50% SPY + 50% T-bills, 0.0 = 100% T-bills
+    position = np.where(trend_long.values, 1.0, np.where(in_dip, 0.5, 0.0))
+    df['position'] = position.astype(float)
 
     daily_tbill = (1 + float(tbill_annual_rate)) ** (1 / 252) - 1
     strategy_values = [float(initial_capital)]
@@ -218,10 +289,10 @@ def calculate_metrics(df):
     # Cost-to-run
     num_trades = (df['position'].diff() != 0).sum()
     trades_per_year = num_trades / years
-    days_in_market = (df['position'] == 1).sum()
+    days_in_market = (df['position'] > 0).sum()
     days_in_market_pct = days_in_market / len(df) * 100 if len(df) > 0 else 0
-    n_entries = ((df['position'] == 1) & (df['position'].shift(1) != 1)).sum()
-    if df['position'].iloc[0] == 1:
+    n_entries = ((df['position'] > 0) & (df['position'].shift(1).fillna(0) == 0)).sum()
+    if df['position'].iloc[0] > 0:
         n_entries += 1
     avg_holding_days = (days_in_market / n_entries) if n_entries > 0 else 0
     # Annual turnover: sum of |position change| * 100% notional, annualized
@@ -230,7 +301,7 @@ def calculate_metrics(df):
     annual_turnover_pct = (100 * turn_notional / avg_aum / years) if avg_aum > 0 and years > 0 else 0
 
     # Win rate (days in market when SPY was up)
-    strategy_trades = df[df['position'] == 1]
+    strategy_trades = df[df['position'] > 0]
     win_rate = (strategy_trades['spy_returns'] > 0).sum() / len(strategy_trades) * 100 if len(strategy_trades) > 0 else 0
 
     # Rolling 12-month Sharpe, drawdown, excess return
@@ -288,7 +359,7 @@ def prepare_chart_data(df):
             'spy': round(row['spy_portfolio'], 2),
             'strategy': round(row['strategy_portfolio'], 2),
             'vix': round(row['vix_close'], 2),
-            'in_market': int(row['position'])
+            'in_market': 1 if row['position'] > 0 else 0
         }
         if 'spy_pct_from_ath' in df.columns and pd.notna(row.get('spy_pct_from_ath')):
             point['spy_pct_from_ath'] = round(row['spy_pct_from_ath'], 2)

@@ -759,6 +759,14 @@
       outline: none;
       border-color: var(--accent);
     }
+    .date-range-section.date-range-readonly input[type="date"] {
+      pointer-events: none;
+      cursor: default;
+      opacity: 0.9;
+    }
+    .date-range-section.date-range-readonly input[type="date"]:focus {
+      border-color: var(--border);
+    }
 
     /* Position / allocation */
     .strategy-rules {
@@ -1024,9 +1032,10 @@
         };
       }
 
-      function updateMetricsDOM(m, idPrefix) {
+      function updateMetricsDOM(m, idPrefix, fullMetrics) {
         if (!m) return;
         var pre = idPrefix || '';
+        var full = fullMetrics || m;
         const set = function (id, text, extraClass) {
           const el = document.getElementById(pre + id);
           if (el) {
@@ -1042,22 +1051,22 @@
         set('metric-sharpe', m.strategy_sharpe != null ? m.strategy_sharpe.toFixed(2) : '—');
         set('metric-win-rate', m.win_rate != null ? m.win_rate.toFixed(1) + '%' : '—');
         set('metric-days-market', (m.days_in_market ?? '—') + ' (' + (m.days_in_market_pct ?? 0).toFixed(1) + '%)');
-        set('metric-trades-per-year', m.trades_per_year != null ? m.trades_per_year.toFixed(1) : '—');
-        set('metric-avg-holding', m.avg_holding_period_days != null ? m.avg_holding_period_days.toFixed(0) + ' days' : '—');
-        set('metric-turnover', m.annual_turnover_pct != null ? m.annual_turnover_pct.toFixed(1) + '%' : '—');
-        set('metric-time-in-market', m.days_in_market_pct != null ? m.days_in_market_pct.toFixed(1) + '%' : '—');
-        set('metric-volatility', m.strategy_volatility != null ? m.strategy_volatility.toFixed(2) + '%' : '—');
-        set('metric-calmar', m.strategy_calmar != null ? m.strategy_calmar.toFixed(2) : '—');
-        set('metric-worst-month', m.worst_month_pct != null ? formatPct(m.worst_month_pct) : '—');
-        set('metric-worst-day', m.worst_day_pct != null ? formatPct(m.worst_day_pct) : '—');
-        set('metric-rolling-sharpe', m.rolling_12m_sharpe && m.rolling_12m_sharpe.length ? (function () {
-          var vals = m.rolling_12m_sharpe.map(function (x) { return x.sharpe; });
+        set('metric-trades-per-year', full.trades_per_year != null ? full.trades_per_year.toFixed(1) : '—');
+        set('metric-avg-holding', full.avg_holding_period_days != null ? full.avg_holding_period_days.toFixed(0) + ' days' : '—');
+        set('metric-turnover', full.annual_turnover_pct != null ? full.annual_turnover_pct.toFixed(1) + '%' : '—');
+        set('metric-time-in-market', full.days_in_market_pct != null ? full.days_in_market_pct.toFixed(1) + '%' : '—');
+        set('metric-volatility', full.strategy_volatility != null ? full.strategy_volatility.toFixed(2) + '%' : '—');
+        set('metric-calmar', full.strategy_calmar != null ? full.strategy_calmar.toFixed(2) : '—');
+        set('metric-worst-month', full.worst_month_pct != null ? formatPct(full.worst_month_pct) : '—');
+        set('metric-worst-day', full.worst_day_pct != null ? formatPct(full.worst_day_pct) : '—');
+        set('metric-rolling-sharpe', full.rolling_12m_sharpe && full.rolling_12m_sharpe.length ? (function () {
+          var vals = full.rolling_12m_sharpe.map(function (x) { return x.sharpe; });
           var min = Math.min.apply(null, vals);
           var mean = vals.reduce(function (a, b) { return a + b; }, 0) / vals.length;
           return 'min ' + min.toFixed(2) + ', avg ' + mean.toFixed(2);
         }()) : '—');
-        set('metric-rolling-excess', m.rolling_12m_excess_vs_spy && m.rolling_12m_excess_vs_spy.length ? (function () {
-          var vals = m.rolling_12m_excess_vs_spy.map(function (x) { return x.excess_pct; });
+        set('metric-rolling-excess', full.rolling_12m_excess_vs_spy && full.rolling_12m_excess_vs_spy.length ? (function () {
+          var vals = full.rolling_12m_excess_vs_spy.map(function (x) { return x.excess_pct; });
           return 'min ' + Math.min.apply(null, vals).toFixed(1) + '%, avg ' + (vals.reduce(function (a, b) { return a + b; }, 0) / vals.length).toFixed(1) + '%';
         }()) : '—');
       }
@@ -1074,9 +1083,10 @@
         var vals = arr.map(function (x) { return x.excess_pct; });
         return 'min ' + Math.min.apply(null, vals).toFixed(1) + '%, avg ' + (vals.reduce(function (a, b) { return a + b; }, 0) / vals.length).toFixed(1) + '%';
       }
-      function renderMetrics(metrics) {
-        if (!metrics) return '';
-        const m = metrics;
+      function renderMetrics(displayMetrics, fullMetrics) {
+        var full = fullMetrics || displayMetrics;
+        if (!displayMetrics) return '';
+        const m = displayMetrics;
         return `
           <div class="metrics-grid">
             <div class="metric">
@@ -1117,19 +1127,19 @@
             <div class="metrics-grid metrics-grid-tight">
               <div class="metric">
                 <div class="metric-label">Trades per year</div>
-                <div class="metric-value" id="metric-trades-per-year">${m.trades_per_year != null ? m.trades_per_year.toFixed(1) : '—'}</div>
+                <div class="metric-value" id="metric-trades-per-year">${full.trades_per_year != null ? full.trades_per_year.toFixed(1) : '—'}</div>
               </div>
               <div class="metric">
                 <div class="metric-label">Avg holding period</div>
-                <div class="metric-value" id="metric-avg-holding">${m.avg_holding_period_days != null ? m.avg_holding_period_days.toFixed(0) + ' days' : '—'}</div>
+                <div class="metric-value" id="metric-avg-holding">${full.avg_holding_period_days != null ? full.avg_holding_period_days.toFixed(0) + ' days' : '—'}</div>
               </div>
               <div class="metric">
                 <div class="metric-label">Annual turnover</div>
-                <div class="metric-value" id="metric-turnover">${m.annual_turnover_pct != null ? m.annual_turnover_pct.toFixed(1) + '%' : '—'}</div>
+                <div class="metric-value" id="metric-turnover">${full.annual_turnover_pct != null ? full.annual_turnover_pct.toFixed(1) + '%' : '—'}</div>
               </div>
               <div class="metric">
                 <div class="metric-label">% time in market</div>
-                <div class="metric-value" id="metric-time-in-market">${m.days_in_market_pct != null ? m.days_in_market_pct.toFixed(1) + '%' : '—'}</div>
+                <div class="metric-value" id="metric-time-in-market">${full.days_in_market_pct != null ? full.days_in_market_pct.toFixed(1) + '%' : '—'}</div>
               </div>
             </div>
           </div>
@@ -1138,27 +1148,27 @@
             <div class="metrics-grid metrics-grid-tight">
               <div class="metric">
                 <div class="metric-label">Volatility (ann.)</div>
-                <div class="metric-value" id="metric-volatility">${m.strategy_volatility != null ? m.strategy_volatility.toFixed(2) + '%' : '—'}</div>
+                <div class="metric-value" id="metric-volatility">${full.strategy_volatility != null ? full.strategy_volatility.toFixed(2) + '%' : '—'}</div>
               </div>
               <div class="metric">
                 <div class="metric-label">Calmar (CAGR/|Max DD|)</div>
-                <div class="metric-value" id="metric-calmar">${m.strategy_calmar != null ? m.strategy_calmar.toFixed(2) : '—'}</div>
+                <div class="metric-value" id="metric-calmar">${full.strategy_calmar != null ? full.strategy_calmar.toFixed(2) : '—'}</div>
               </div>
               <div class="metric">
                 <div class="metric-label">Worst month</div>
-                <div class="metric-value negative" id="metric-worst-month">${m.worst_month_pct != null ? formatPct(m.worst_month_pct) : '—'}</div>
+                <div class="metric-value negative" id="metric-worst-month">${full.worst_month_pct != null ? formatPct(full.worst_month_pct) : '—'}</div>
               </div>
               <div class="metric">
                 <div class="metric-label">Worst day</div>
-                <div class="metric-value negative" id="metric-worst-day">${m.worst_day_pct != null ? formatPct(m.worst_day_pct) : '—'}</div>
+                <div class="metric-value negative" id="metric-worst-day">${full.worst_day_pct != null ? formatPct(full.worst_day_pct) : '—'}</div>
               </div>
               <div class="metric metric-wide">
                 <div class="metric-label">Rolling 12m Sharpe</div>
-                <div class="metric-value" id="metric-rolling-sharpe">${m.rolling_12m_sharpe && m.rolling_12m_sharpe.length ? rollSummary(m.rolling_12m_sharpe, 'sharpe') : '—'}</div>
+                <div class="metric-value" id="metric-rolling-sharpe">${full.rolling_12m_sharpe && full.rolling_12m_sharpe.length ? rollSummary(full.rolling_12m_sharpe, 'sharpe') : '—'}</div>
               </div>
               <div class="metric metric-wide">
                 <div class="metric-label">Rolling 12m excess vs SPY</div>
-                <div class="metric-value" id="metric-rolling-excess">${m.rolling_12m_excess_vs_spy && m.rolling_12m_excess_vs_spy.length ? rollExcessSummary(m.rolling_12m_excess_vs_spy) : '—'}</div>
+                <div class="metric-value" id="metric-rolling-excess">${full.rolling_12m_excess_vs_spy && full.rolling_12m_excess_vs_spy.length ? rollExcessSummary(full.rolling_12m_excess_vs_spy) : '—'}</div>
               </div>
             </div>
           </div>
@@ -1560,7 +1570,7 @@
         var displayMetrics = initialSlice.length ? (computeMetricsAsOf(initialSlice, null, null) || metrics) : metrics;
         target.innerHTML = `
           <p class="replay-label" id="metrics-as-of">As of ${formatDate(currentDate)}</p>
-          ${renderMetrics(displayMetrics)}
+          ${renderMetrics(displayMetrics, metrics)}
           <div id="position-indicator" class="position-indicator ${inMarket ? 'in-market' : 'cash'}">
             ${inMarket ? 'In market (100% SPY)' : 'In cash (0% SPY)'}
           </div>
@@ -1664,11 +1674,11 @@
         var initialSlice = displayPortfolio.slice(0, sma200ReplayIndex + 1);
         var displayMetrics = initialSlice.length ? (computeMetricsAsOf(initialSlice, null, null) || metrics) : metrics;
         target.innerHTML = '<p class="replay-label" id="sma200-metrics-as-of">As of ' + formatDate(currentDate) + '</p>' +
-          renderMetrics(displayMetrics).replace(/id="metric-/g, 'id="sma200-metric-') +
+          renderMetrics(displayMetrics, metrics).replace(/id="metric-/g, 'id="sma200-metric-') +
           '<div id="sma200-position-indicator" class="position-indicator ' + (inMarket ? 'in-market' : 'cash') + '">' + (inMarket ? 'In market (100% SPY)' : (cfg.strategy === 'sma50_200_tbill' ? 'In T-bills' : 'In cash (0% SPY)')) + '</div>' +
-          '<div class="date-range-section">' +
-          '<label>From <input type="date" id="sma200-date-start" value="' + (sma200DateFilterStart || firstDate) + '" min="' + firstDate + '" max="' + lastDate + '" /></label>' +
-          '<label>To <input type="date" id="sma200-date-end" value="' + (sma200DateFilterEnd || lastDate) + '" min="' + firstDate + '" max="' + lastDate + '" /></label>' +
+          '<div class="date-range-section date-range-readonly">' +
+          '<label>From <input type="date" id="sma200-date-start" readonly tabindex="-1" value="' + (sma200DateFilterStart || firstDate) + '" min="' + firstDate + '" max="' + lastDate + '" /></label>' +
+          '<label>To <input type="date" id="sma200-date-end" readonly tabindex="-1" value="' + (sma200DateFilterEnd || lastDate) + '" min="' + firstDate + '" max="' + lastDate + '" /></label>' +
           '</div>' +
           '<div class="replay-section">' +
           '<div class="replay-label">Historical replay</div>' +
@@ -1783,7 +1793,7 @@
           var posEl = document.getElementById('sma200-position-indicator');
           if (posEl) { posEl.textContent = inMarket ? 'In market (100% SPY)' : 'In cash (0% SPY)'; posEl.className = 'position-indicator ' + (inMarket ? 'in-market' : 'cash'); }
           var asOfMetrics = computeMetricsAsOf(visible, null, null);
-          updateMetricsDOM(asOfMetrics, 'sma200-');
+          updateMetricsDOM(asOfMetrics, 'sma200-', sma200Data.metrics);
           var asOfLabel = document.getElementById('sma200-metrics-as-of');
           if (asOfLabel) asOfLabel.textContent = 'As of ' + formatDate(date);
         } catch (err) { console.warn('updateChartsSma200', err); }
@@ -1984,11 +1994,11 @@
       var strategyContent = {
         sma200: {
           tagline: 'Rides market trends and avoids fighting the tape.',
-          math: 'SMA(n) = average of last n closes. Position = 1 if Close &gt; SMA(n), else 0. Daily return = r_t × position (cash when out).'
+          math: 'SMA(n): long when Close &gt; SMA(n), else cash. Dip-buy: when bearish (Close &lt; SMA50), 50% SPY when RSI(14)&lt;30 or price &gt;10% below SMA50; exit when RSI&gt;50 or Close&gt;SMA50.'
         },
         sma50_200_tbill: {
           tagline: 'Dials risk up or down as the market mood changes.',
-          math: 'SMA₅₀, SMA₂₀₀. In market when Close &gt; SMA₅₀ and SMA₅₀ &gt; SMA₂₀₀. Return = r_t×position + r_T-bill×(1−position); daily T-bill = (1+r_ann)^(1/252)−1.'
+          math: 'SMA₅₀, SMA₂₀₀: long when Close &gt; SMA₅₀ and SMA₅₀ &gt; SMA₂₀₀; else T-bills. Dip-buy: when bearish, 50% SPY when RSI(14)&lt;30 or price &gt;10% below SMA50; exit when RSI&gt;50 or Close&gt;SMA50.'
         },
         vix: {
           tagline: 'Looks for opportunity when market fear spikes.',
@@ -2013,10 +2023,10 @@
         }
         if (strategy === 'sma50_200_tbill') {
           var tbill = tbillEl ? Number(tbillEl.value) : 4;
-          return 'Long SPY when Close &gt; SMA(50) and SMA(50) &gt; SMA(200); otherwise T-bills (' + tbill + '% annual). Start $' + capStr + '.';
+          return 'Long SPY when Close &gt; SMA(50) and SMA(50) &gt; SMA(200); else T-bills (' + tbill + '%). Dip-buy: in bearish mode, 50% SPY when RSI&lt;30 or price &gt;10% below SMA50; exit when RSI&gt;50 or Close&gt;SMA50. Start $' + capStr + '.';
         }
         var period = smaEl ? Number(smaEl.value) || 200 : 200;
-        return 'Long SPY when close &gt; ' + period + '-day SMA; otherwise cash. Start $' + capStr + '.';
+        return 'Long SPY when close &gt; ' + period + '-day SMA; else cash. Dip-buy: when bearish (Close&lt;SMA50), 50% SPY when RSI&lt;30 or price &gt;10% below SMA50; exit when RSI&gt;50 or Close&gt;SMA50. Start $' + capStr + '.';
       }
 
       function updateStrategyDescription() {
@@ -2403,20 +2413,6 @@
           stopReplaySma200();
           sma200ReplayIndex = parseInt(e.target.value, 10);
           updateChartsSma200(sma200ReplayIndex);
-        }
-        if (e.target.id === 'sma200-date-start') {
-          sma200DateFilterStart = e.target.value;
-          if (sma200DateFilterEnd && sma200DateFilterStart > sma200DateFilterEnd) sma200DateFilterEnd = sma200DateFilterStart;
-          stopReplaySma200();
-          sma200ReplayIndex = 0;
-          renderStrategySma200();
-        }
-        if (e.target.id === 'sma200-date-end') {
-          sma200DateFilterEnd = e.target.value;
-          if (sma200DateFilterStart && sma200DateFilterEnd < sma200DateFilterStart) sma200DateFilterStart = sma200DateFilterEnd;
-          stopReplaySma200();
-          sma200ReplayIndex = 0;
-          renderStrategySma200();
         }
       });
 
