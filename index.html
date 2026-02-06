@@ -133,25 +133,11 @@
       opacity: 1;
     }
 
-    .hero p {
+    .hero .hero-tagline {
       font-size: 1.1rem;
       color: var(--muted);
-      max-width: 480px;
-      margin: 0 auto 2rem;
-    }
-    .hero .hero-tagline {
-      font-size: 1.25rem;
-      color: var(--accent);
-      font-weight: 500;
-      margin-bottom: 0.5rem;
-    }
-    .hero .hero-definition {
-      font-size: 0.9rem;
-      font-style: italic;
-      color: var(--muted);
-      opacity: 0.9;
-      max-width: 520px;
-      margin: 0 auto 2rem;
+      max-width: 360px;
+      margin: 0.5rem auto 0;
     }
 
     /* Strategy cards */
@@ -656,6 +642,24 @@
       font-family: 'JetBrains Mono', monospace;
       font-size: 0.85rem;
     }
+    .date-parts {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.2rem;
+    }
+    .date-parts input {
+      width: 3.5ch;
+      text-align: center;
+    }
+    .date-parts input[name="start_year"],
+    .date-parts input[name="end_year"] {
+      width: 5ch;
+    }
+    .date-sep {
+      color: var(--muted);
+      font-weight: 600;
+      user-select: none;
+    }
     .backtest-config select:focus,
     .backtest-config input:focus {
       outline: none;
@@ -791,9 +795,7 @@
   <div class="page">
     <header class="hero">
       <h1>Policy<span class="hero-fn"><span class="hero-fn-full">Function</span><span class="hero-fn-math">f(x)</span></span></h1>
-      <p class="hero-tagline">π(s) — the decision rule mapping state to action.</p>
-      <p>Test your own strategies: pick a strategy, set dates and parameters, run a backtest, and see results with replay.</p>
-      <p class="hero-definition">A policy function, denoted π(s), is a fundamental concept in reinforcement learning and optimal control theory that defines the decision-making strategy of an agent.</p>
+      <p class="hero-tagline">Backtest your strategies — set dates, run, replay.</p>
     </header>
 
     <section class="backtest-config" id="backtest-config">
@@ -811,11 +813,23 @@
           <p class="strategy-description" id="strategy-description" aria-live="polite">Systematic time-series momentum filter to condition equity exposure on prevailing market trends.</p>
           <label>
             Start date
-            <input type="date" id="config-start" name="start" required />
+            <span class="date-parts" aria-label="Start date: month, day, year">
+              <input type="number" id="config-start-month" name="start_month" min="1" max="12" placeholder="MM" aria-label="Start month" inputmode="numeric" />
+              <span class="date-sep">/</span>
+              <input type="number" id="config-start-day" name="start_day" min="1" max="31" placeholder="DD" aria-label="Start day" inputmode="numeric" />
+              <span class="date-sep">/</span>
+              <input type="number" id="config-start-year" name="start_year" min="1990" max="2030" placeholder="YYYY" aria-label="Start year" inputmode="numeric" />
+            </span>
           </label>
           <label>
             End date
-            <input type="date" id="config-end" name="end" required />
+            <span class="date-parts" aria-label="End date: month, day, year">
+              <input type="number" id="config-end-month" name="end_month" min="1" max="12" placeholder="MM" aria-label="End month" inputmode="numeric" />
+              <span class="date-sep">/</span>
+              <input type="number" id="config-end-day" name="end_day" min="1" max="31" placeholder="DD" aria-label="End day" inputmode="numeric" />
+              <span class="date-sep">/</span>
+              <input type="number" id="config-end-year" name="end_year" min="1990" max="2030" placeholder="YYYY" aria-label="End year" inputmode="numeric" />
+            </span>
           </label>
           <label>
             Initial capital ($)
@@ -1842,27 +1856,42 @@
       }
 
       function setDefaultDates() {
-        var endEl = document.getElementById('config-end');
-        var startEl = document.getElementById('config-start');
-        if (!endEl || !startEl) return;
         var end = new Date();
         var start = new Date(end);
         start.setFullYear(start.getFullYear() - 5);
-        endEl.value = end.toISOString().slice(0, 10);
-        startEl.value = start.toISOString().slice(0, 10);
+        setDateParts('config-start', start.getMonth() + 1, start.getDate(), start.getFullYear());
+        setDateParts('config-end', end.getMonth() + 1, end.getDate(), end.getFullYear());
         syncDateConstraints();
       }
 
+      function setDateParts(prefix, month, day, year) {
+        var m = document.getElementById(prefix + '-month');
+        var d = document.getElementById(prefix + '-day');
+        var y = document.getElementById(prefix + '-year');
+        if (m) m.value = month;
+        if (d) d.value = day;
+        if (y) y.value = year;
+      }
+
+      function getDateString(prefix) {
+        var m = document.getElementById(prefix + '-month');
+        var d = document.getElementById(prefix + '-day');
+        var y = document.getElementById(prefix + '-year');
+        if (!m || !d || !y) return '';
+        var month = parseInt(m.value, 10);
+        var day = parseInt(d.value, 10);
+        var year = parseInt(y.value, 10);
+        if (isNaN(month) || isNaN(day) || isNaN(year)) return '';
+        var pad = function (n) { return n < 10 ? '0' + n : String(n); };
+        return year + '-' + pad(month) + '-' + pad(day);
+      }
+
       function syncDateConstraints() {
-        var startEl = document.getElementById('config-start');
-        var endEl = document.getElementById('config-end');
-        if (!startEl || !endEl) return;
-        var today = new Date().toISOString().slice(0, 10);
-        var startVal = startEl.value;
-        var endVal = endEl.value;
-        startEl.setAttribute('max', endVal || today);
-        endEl.setAttribute('min', startVal || '');
-        endEl.setAttribute('max', today);
+        var today = new Date();
+        var endYear = document.getElementById('config-end-year');
+        var startYear = document.getElementById('config-start-year');
+        if (endYear) endYear.setAttribute('max', today.getFullYear());
+        if (startYear && endYear && endYear.value) startYear.setAttribute('max', endYear.value);
       }
 
       function setupBacktestForm() {
@@ -1888,17 +1917,13 @@
         toggleParams();
         if (form) form.addEventListener('submit', function (e) { e.preventDefault(); runBacktestFromForm(); });
         syncDateConstraints();
-        var startInput = document.getElementById('config-start');
-        var endInput = document.getElementById('config-end');
-        if (startInput) startInput.addEventListener('input', syncDateConstraints);
-        if (startInput) startInput.addEventListener('change', syncDateConstraints);
-        if (endInput) endInput.addEventListener('input', syncDateConstraints);
-        if (endInput) endInput.addEventListener('change', syncDateConstraints);
+        ['config-start-month', 'config-start-day', 'config-start-year', 'config-end-month', 'config-end-day', 'config-end-year'].forEach(function (id) {
+          var el = document.getElementById(id);
+          if (el) { el.addEventListener('input', syncDateConstraints); el.addEventListener('change', syncDateConstraints); }
+        });
       }
 
       function runBacktestFromForm() {
-        var startEl = document.getElementById('config-start');
-        var endEl = document.getElementById('config-end');
         var strategyEl = document.getElementById('config-strategy');
         var capitalEl = document.getElementById('config-capital');
         var smaPeriodEl = document.getElementById('config-sma-period');
@@ -1907,11 +1932,17 @@
         var btn = document.getElementById('btn-run-backtest');
         var msgEl = document.getElementById('backtest-msg');
         var target = document.getElementById('sma200-content');
-        if (!startEl || !endEl || !strategyEl) return;
-        var start = startEl.value;
-        var end = endEl.value;
+        if (!strategyEl) return;
+        var start = getDateString('config-start');
+        var end = getDateString('config-end');
         if (!start || !end) {
-          if (msgEl) { msgEl.textContent = 'Please set start and end dates.'; msgEl.className = 'load-msg error'; }
+          if (msgEl) { msgEl.textContent = 'Please set start and end dates (month, day, year).'; msgEl.className = 'load-msg error'; }
+          return;
+        }
+        var startD = new Date(start);
+        var endD = new Date(end);
+        if (isNaN(startD.getTime()) || isNaN(endD.getTime())) {
+          if (msgEl) { msgEl.textContent = 'Invalid date (e.g. use month 1–12, day 1–31).'; msgEl.className = 'load-msg error'; }
           return;
         }
         if (start > end) {
