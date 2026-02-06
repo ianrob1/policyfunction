@@ -54,6 +54,30 @@ def fetch_data(start_date, end_date, ticker='SPY'):
     return df.dropna()
 
 
+def fetch_data_spy_tqqq(start_date, end_date):
+    """Fetch SPY, VIX, and TQQQ for Stay In or Step Out (signals from SPY, equity leg TQQQ)."""
+    raw = yf.download(['SPY', '^VIX', 'TQQQ'], start=start_date, end=end_date, progress=False, auto_adjust=True, group_by='column')
+    if raw.empty or len(raw) < 2:
+        raise ValueError("No or insufficient data for SPY/VIX/TQQQ")
+    if isinstance(raw.columns, pd.MultiIndex) and 'Close' in raw.columns.get_level_values(0):
+        close = raw['Close']
+        df = pd.DataFrame({
+            'spy_close': close['SPY'],
+            'vix_close': close['^VIX'],
+            'tqqq_close': close['TQQQ'],
+        })
+    else:
+        raise ValueError("Unexpected column structure from yfinance")
+    df = df.dropna(how='any')
+    if 'spy_open' not in df.columns:
+        open_df = raw['Open'] if 'Open' in raw.columns.get_level_values(0) else None
+        if open_df is not None and 'SPY' in open_df.columns:
+            df['spy_open'] = open_df['SPY'].reindex(df.index).ffill().bfill()
+        else:
+            df['spy_open'] = df['spy_close']
+    return df
+
+
 def fetch_data_allweather(start_date, end_date):
     """Fetch SPY, TLT, IEF, GLD, BIL, VIX for All-Weather strategy. Returns aligned DataFrame."""
     start = pd.to_datetime(start_date)
@@ -329,16 +353,21 @@ def backtest_sma200_strategy(df, initial_capital=10000):
 
 def backtest_sma50_200_tbill(df, initial_capital=10000, tbill_annual_rate=0.04):
     """
-    Stay In or Step Out (revised):
+    Stay In or Step Out (revised): signals from SPY, equity exposure in TQQQ when in market.
     Entry: 100% when Close>SMA50 and SMA50>SMA200, or stay long when 100% and Close>SMA100.
            75% when not long and (Close<SMA50 and RSI<30) [aggressive dip-buy], or from T-bills when RSI<30
             or (Close >8% below 50d high and RSI<40). Upgrade 75%->100% when Close>SMA(21).
     Early exit from 100% (any): Close<SMA50 and RSI<50; Close crosses below SMA(21);
             SPY >3% below 20d high; death cross SMA50<SMA200.
-    Default: T-bills. No lookahead; frictions applied.
+    Default: T-bills. When in market (75% or 100%), hold TQQQ; otherwise T-bills.
     """
     df = df.copy()
     df['spy_returns'] = df['spy_close'].pct_change().fillna(0)
+    if 'tqqq_close' in df.columns:
+        df['tqqq_returns'] = df['tqqq_close'].pct_change().fillna(0)
+        equity_returns = df['tqqq_returns']
+    else:
+        equity_returns = df['spy_returns']
     sma21 = df['spy_close'].rolling(21, min_periods=21).mean()
     sma50 = df['spy_close'].rolling(50, min_periods=50).mean()
     sma100 = df['spy_close'].rolling(100, min_periods=100).mean()
@@ -409,7 +438,7 @@ def backtest_sma50_200_tbill(df, initial_capital=10000, tbill_annual_rate=0.04):
     strategy_values = [float(initial_capital)]
     for i in range(1, len(df)):
         prev = strategy_values[-1]
-        ret = df['spy_returns'].iloc[i]
+        ret = equity_returns.iloc[i]
         pos = df['position'].iloc[i]
         pos_prev = df['position'].iloc[i - 1]
         strategy_ret = ret * pos + daily_tbill * (1 - pos)
@@ -661,6 +690,9 @@ def run_backtest_custom(start_date_str, end_date_str, strategy='sma200', initial
     if strategy == 'all_weather':
         print(f"Fetching All-Weather data from {start_date} to {end_date}...", file=sys.stderr)
         df = fetch_data_allweather(start_date, end_date)
+    elif strategy == 'sma50_200_tbill':
+        print(f"Fetching SPY/VIX/TQQQ from {start_date} to {end_date}...", file=sys.stderr)
+        df = fetch_data_spy_tqqq(start_date, end_date)
     else:
         print(f"Fetching data from {start_date} to {end_date}...", file=sys.stderr)
         df = fetch_data(start_date, end_date)
