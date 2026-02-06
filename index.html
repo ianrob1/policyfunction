@@ -54,27 +54,12 @@
     /* Hero */
     .hero-wrap {
       padding: 4rem 0 3rem;
-      display: flex;
-      flex-direction: row;
-      flex-wrap: wrap;
-      align-items: flex-start;
-      justify-content: center;
-      gap: 0 2.5rem;
-    }
-    .hero-wrap.hero-wrap--split {
-      justify-content: center;
-    }
-    @media (max-width: 720px) {
-      .hero-wrap.hero-wrap--split {
-        flex-direction: column;
-      }
+      text-align: center;
     }
     .hero {
       padding: 0;
       text-align: center;
-      flex: 0 0 auto;
-      margin-left: 0;
-      margin-right: 0;
+      margin: 0 auto;
     }
 
     .hero h1 {
@@ -160,32 +145,7 @@
       margin: 0.5rem auto 0;
     }
     .hero-definition-panel {
-      flex: 0 0 0;
-      min-width: 0;
-      overflow: hidden;
-      opacity: 0;
-      transition: flex 0.7s ease, opacity 0.6s ease;
-    }
-    .hero-wrap--split .hero-definition-panel {
-      flex: 1 1 0;
-      min-width: min(280px, 100%);
-      opacity: 1;
-    }
-    .hero-definition-text {
-      font-size: 0.95rem;
-      line-height: 1.6;
-      color: var(--muted);
-      margin: 0;
-      font-style: italic;
-    }
-    .typewriter-caret {
-      display: inline-block;
-      color: var(--accent);
-      animation: blink-caret 0.9s step-end infinite;
-      margin-left: 1px;
-    }
-    @keyframes blink-caret {
-      50% { opacity: 0; }
+      display: none;
     }
 
     /* Strategy cards */
@@ -689,6 +649,9 @@
       padding: 0.5rem 0.6rem;
       font-family: 'JetBrains Mono', monospace;
       font-size: 0.85rem;
+    }
+    #config-strategy {
+      min-width: 11.5rem;
     }
     .backtest-config select:focus,
     .backtest-config input:focus {
@@ -1833,8 +1796,17 @@
           if (vals[1]) vals[1].textContent = formatMoney(p.strategy);
           tooltip.classList.add('visible');
           tooltip.style.position = 'fixed';
-          tooltip.style.left = (e.clientX + 14) + 'px';
-          tooltip.style.top = (e.clientY + 14) + 'px';
+          var pad = 14;
+          var left = e.clientX + pad;
+          var top = e.clientY + pad;
+          tooltip.style.left = left + 'px';
+          tooltip.style.top = top + 'px';
+          var w = tooltip.offsetWidth;
+          var h = tooltip.offsetHeight;
+          if (left + w > window.innerWidth) tooltip.style.left = Math.max(8, e.clientX - pad - w) + 'px';
+          if (top + h > window.innerHeight) tooltip.style.top = Math.max(8, e.clientY - pad - h) + 'px';
+          if (parseInt(tooltip.style.left, 10) < 8) tooltip.style.left = '8px';
+          if (parseInt(tooltip.style.top, 10) < 8) tooltip.style.top = '8px';
         }
         function hidePortfolioTooltip() {
           var tooltip = document.getElementById('sma200-chart-tooltip-portfolio');
@@ -1867,8 +1839,17 @@
           if (valEl) valEl.textContent = (p.vix != null ? p.vix.toFixed(1) : '—');
           tooltip.classList.add('visible');
           tooltip.style.position = 'fixed';
-          tooltip.style.left = (e.clientX + 14) + 'px';
-          tooltip.style.top = (e.clientY + 14) + 'px';
+          var pad = 14;
+          var left = e.clientX + pad;
+          var top = e.clientY + pad;
+          tooltip.style.left = left + 'px';
+          tooltip.style.top = top + 'px';
+          var w = tooltip.offsetWidth;
+          var h = tooltip.offsetHeight;
+          if (left + w > window.innerWidth) tooltip.style.left = Math.max(8, e.clientX - pad - w) + 'px';
+          if (top + h > window.innerHeight) tooltip.style.top = Math.max(8, e.clientY - pad - h) + 'px';
+          if (parseInt(tooltip.style.left, 10) < 8) tooltip.style.left = '8px';
+          if (parseInt(tooltip.style.top, 10) < 8) tooltip.style.top = '8px';
         }
         function hideVixTooltip() {
           var tooltip = document.getElementById('sma200-chart-tooltip-vix');
@@ -2271,27 +2252,6 @@
           .catch(function () { if (el) el.innerHTML = '<p class="load-state">Strategy study unavailable. Start the server with <code>./run.sh</code> and refresh.</p>'; });
       }
 
-      var HERO_DEFINITION = 'A policy function, denoted as \u03C0(s), is a fundamental concept in reinforcement learning and optimal control theory that defines the decision-making strategy of an agent.';
-
-      function runHeroDefinitionSequence() {
-        var wrap = document.getElementById('hero-wrap');
-        var textEl = document.getElementById('hero-definition-text');
-        var caretEl = document.getElementById('typewriter-caret');
-        if (!wrap || !textEl) return;
-        wrap.classList.add('hero-wrap--split');
-        var i = 0;
-        function typeNext() {
-          if (i < HERO_DEFINITION.length) {
-            textEl.textContent += HERO_DEFINITION.charAt(i);
-            i += 1;
-            setTimeout(typeNext, 32);
-          } else {
-            if (caretEl) caretEl.style.visibility = 'hidden';
-          }
-        }
-        typeNext();
-      }
-
       function run() {
         try {
           setDefaultDates();
@@ -2305,7 +2265,6 @@
               sma200Header.setAttribute('aria-expanded', sma200Card.classList.contains('expanded'));
             });
           }
-          setTimeout(runHeroDefinitionSequence, 7000);
         } catch (err) {
           var c = document.getElementById('sma200-content');
           if (c) c.innerHTML = '<p class="error-msg">Dashboard error: ' + String(err && err.message ? err.message : err) + '</p>';
