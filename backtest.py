@@ -127,6 +127,40 @@ def backtest_sma200_strategy(df, initial_capital=10000):
     return backtest_sma_strategy(df, period=200, initial_capital=initial_capital)
 
 
+def backtest_sma50_200_tbill(df, initial_capital=10000, tbill_annual_rate=0.04):
+    """
+    Long SPY if Close > SMA(50) AND SMA(50) > SMA(200); otherwise T-bills.
+    tbill_annual_rate: annualized T-bill return (e.g. 0.04 = 4%).
+    """
+    df = df.copy()
+    df['spy_returns'] = df['spy_close'].pct_change().fillna(0)
+    sma50 = df['spy_close'].rolling(50, min_periods=50).mean()
+    sma200 = df['spy_close'].rolling(200, min_periods=200).mean()
+    # In market when close > SMA50 and SMA50 > SMA200
+    position = ((df['spy_close'] > sma50) & (sma50 > sma200)).astype(int).fillna(0)
+    df['position'] = position
+
+    daily_tbill = (1 + float(tbill_annual_rate)) ** (1 / 252) - 1
+    strategy_values = [float(initial_capital)]
+    for i in range(1, len(df)):
+        prev = strategy_values[-1]
+        ret = df['spy_returns'].iloc[i]
+        pos = df['position'].iloc[i]
+        # When in market: SPY return; when out: T-bill return
+        strategy_ret = ret * pos + daily_tbill * (1 - pos)
+        strategy_values.append(prev * (1 + strategy_ret))
+    df['strategy_portfolio'] = strategy_values
+    df['spy_cumulative'] = (1 + df['spy_returns']).cumprod()
+    df['spy_portfolio'] = initial_capital * df['spy_cumulative']
+    df['strategy_returns'] = pd.Series(strategy_values, index=df.index).pct_change().fillna(0)
+    df['spy_peak'] = df['spy_portfolio'].cummax()
+    df['strategy_peak'] = df['strategy_portfolio'].cummax()
+    df['spy_drawdown'] = (df['spy_portfolio'] - df['spy_peak']) / df['spy_peak'] * 100
+    df['strategy_drawdown'] = (df['strategy_portfolio'] - df['strategy_peak']) / df['strategy_peak'] * 100
+    df['spy_pct_from_ath'] = (df['spy_close'] - df['spy_close'].cummax()) / df['spy_close'].cummax() * 100
+    return df
+
+
 def calculate_metrics(df):
     """Calculate performance metrics"""
     
@@ -299,11 +333,11 @@ def run_backtest_sma200(years=5):
 
 
 def run_backtest_custom(start_date_str, end_date_str, strategy='sma200', initial_capital=10000,
-                        sma_period=200, vix_threshold=30, buy_dollars=1000):
+                        sma_period=200, vix_threshold=30, buy_dollars=1000, tbill_annual_rate=0.04):
     """
     Run a backtest over a custom date range with chosen strategy and params.
     start_date_str, end_date_str: 'YYYY-MM-DD'
-    strategy: 'sma200', 'sma50', 'vix'
+    strategy: 'sma200', 'sma50', 'vix', 'sma50_200_tbill'
     Returns same dict shape as run_backtest for dashboard.
     """
     start_date = pd.to_datetime(start_date_str).date()
@@ -328,8 +362,13 @@ def run_backtest_custom(start_date_str, end_date_str, strategy='sma200', initial
         df = backtest_vix_strategy(df, initial_capital=initial_capital,
                                    vix_buy_above=int(vix_threshold), buy_dollars=int(buy_dollars))
         config = {'strategy': 'vix', 'vix_threshold': int(vix_threshold), 'buy_dollars': int(buy_dollars)}
+    elif strategy == 'sma50_200_tbill':
+        rate = float(tbill_annual_rate)
+        print(f"Running SMA50/200 + T-bills (long when Close>SMA50 and SMA50>SMA200; else T-bills at {rate*100:.1f}%)...", file=sys.stderr)
+        df = backtest_sma50_200_tbill(df, initial_capital=initial_capital, tbill_annual_rate=rate)
+        config = {'strategy': 'sma50_200_tbill', 'tbill_annual_rate_pct': round(rate * 100, 2)}
     else:
-        raise ValueError("strategy must be sma200, sma50, or vix")
+        raise ValueError("strategy must be sma200, sma50, vix, or sma50_200_tbill")
     metrics = calculate_metrics(df)
     charts = prepare_chart_data(df)
     config['start_date'] = df.index[0].strftime('%Y-%m-%d')
@@ -395,11 +434,12 @@ if __name__ == "__main__":
     parser.add_argument('mode', nargs='?', default='vix', help='vix | sma200 | compare')
     parser.add_argument('--start', type=str, help='Start date YYYY-MM-DD (custom run)')
     parser.add_argument('--end', type=str, help='End date YYYY-MM-DD (custom run)')
-    parser.add_argument('--strategy', type=str, default='sma200', choices=['sma200', 'sma50', 'vix'], help='Strategy for custom run')
+    parser.add_argument('--strategy', type=str, default='sma200', choices=['sma200', 'sma50', 'vix', 'sma50_200_tbill'], help='Strategy for custom run')
     parser.add_argument('--capital', type=int, default=10000, help='Initial capital for custom run')
     parser.add_argument('--sma-period', type=int, default=200, help='SMA period for sma200 strategy')
     parser.add_argument('--vix-threshold', type=int, default=30, help='VIX threshold for vix strategy')
     parser.add_argument('--buy-dollars', type=int, default=1000, help='Dollars per day when VIX above threshold')
+    parser.add_argument('--tbill-annual-rate', type=float, default=0.04, help='T-bill annual rate (decimal, e.g. 0.04) for sma50_200_tbill')
     args = parser.parse_args()
 
     if args.start and args.end:
@@ -410,6 +450,7 @@ if __name__ == "__main__":
             sma_period=args.sma_period,
             vix_threshold=args.vix_threshold,
             buy_dollars=args.buy_dollars,
+            tbill_annual_rate=args.tbill_annual_rate,
         )
         print(json.dumps(result, indent=2))
     elif args.mode == 'compare':

@@ -29,12 +29,14 @@ class handler(BaseHTTPRequestHandler):
                 self.wfile.write(json.dumps({"error": "start and end (YYYY-MM-DD) required"}).encode("utf-8"))
                 return
             strategy = (qs.get("strategy") or ["sma200"])[0]
-            if strategy not in ("sma200", "sma50", "vix"):
+            if strategy not in ("sma200", "sma50", "vix", "sma50_200_tbill"):
                 strategy = "sma200"
             capital = int((qs.get("capital") or ["10000"])[0])
             sma_period = int((qs.get("sma_period") or ["200"])[0])
             vix_threshold = int((qs.get("vix_threshold") or ["30"])[0])
             buy_dollars = int((qs.get("buy_dollars") or ["1000"])[0])
+            tbill_pct = float((qs.get("tbill_annual_rate") or ["4"])[0])
+            tbill_annual_rate = tbill_pct / 100.0 if tbill_pct > 1 else tbill_pct
             from backtest import run_backtest_custom
             result = run_backtest_custom(
                 start, end,
@@ -43,6 +45,7 @@ class handler(BaseHTTPRequestHandler):
                 sma_period=sma_period,
                 vix_threshold=vix_threshold,
                 buy_dollars=buy_dollars,
+                tbill_annual_rate=tbill_annual_rate,
             )
             self.wfile.write(json.dumps(result).encode("utf-8"))
         except ValueError as e:

@@ -780,6 +780,7 @@
             <select id="config-strategy" name="strategy">
               <option value="sma200">SMA 200 — Long when close &gt; 200d SMA</option>
               <option value="sma50">SMA 50 — Long when close &gt; 50d SMA</option>
+              <option value="sma50_200_tbill">SMA 50/200 + T-bills — Long when Close &gt; SMA(50) and SMA(50) &gt; SMA(200); else T-bills</option>
               <option value="vix">VIX — Buy SPY when VIX above threshold</option>
             </select>
           </label>
@@ -799,6 +800,12 @@
             <label>
               SMA period
               <input type="number" id="config-sma-period" name="sma_period" min="2" value="200" />
+            </label>
+          </div>
+          <div class="strategy-params" id="params-tbill">
+            <label>
+              T-bill annual rate (%)
+              <input type="number" id="config-tbill-rate" name="tbill_annual_rate" min="0" max="20" step="0.5" value="4" />
             </label>
           </div>
           <div class="strategy-params" id="params-vix">
@@ -1529,11 +1536,13 @@
         var displayMetrics = initialSlice.length ? (computeMetricsAsOf(initialSlice, null, null) || metrics) : metrics;
         var ruleText = (cfg.strategy === 'vix')
           ? '<strong>Rule:</strong> Start $' + (cfg.initial_capital != null ? Number(cfg.initial_capital).toLocaleString() : '10,000') + '. Buy $' + (cfg.buy_dollars != null ? Number(cfg.buy_dollars).toLocaleString() : '1,000') + ' of SPY every day VIX is above ' + (cfg.vix_threshold != null ? cfg.vix_threshold : 30) + '. No selling.'
+          : (cfg.strategy === 'sma50_200_tbill')
+          ? '<strong>Rule:</strong> Long SPY when Close &gt; SMA(50) and SMA(50) &gt; SMA(200); otherwise T-bills (' + (cfg.tbill_annual_rate_pct != null ? cfg.tbill_annual_rate_pct : 4) + '% annual). Start $' + (cfg.initial_capital != null ? Number(cfg.initial_capital).toLocaleString() : '10,000') + '.'
           : '<strong>Rule:</strong> Long SPY when close &gt; ' + (cfg.sma_period || 200) + '-day SMA; otherwise cash. Start $' + (cfg.initial_capital != null ? Number(cfg.initial_capital).toLocaleString() : '10,000') + '.';
         target.innerHTML = '<p class="replay-label" id="sma200-metrics-as-of">As of ' + formatDate(currentDate) + '</p>' +
           renderMetrics(displayMetrics).replace(/id="metric-/g, 'id="sma200-metric-') +
           '<p class="strategy-rules">' + ruleText + '</p>' +
-          '<div id="sma200-position-indicator" class="position-indicator ' + (inMarket ? 'in-market' : 'cash') + '">' + (inMarket ? 'In market (100% SPY)' : 'In cash (0% SPY)') + '</div>' +
+          '<div id="sma200-position-indicator" class="position-indicator ' + (inMarket ? 'in-market' : 'cash') + '">' + (inMarket ? 'In market (100% SPY)' : (cfg.strategy === 'sma50_200_tbill' ? 'In T-bills' : 'In cash (0% SPY)')) + '</div>' +
           '<div class="date-range-section">' +
           '<label>From <input type="date" id="sma200-date-start" value="' + (sma200DateFilterStart || firstDate) + '" min="' + firstDate + '" max="' + lastDate + '" /></label>' +
           '<label>To <input type="date" id="sma200-date-end" value="' + (sma200DateFilterEnd || lastDate) + '" min="' + firstDate + '" max="' + lastDate + '" /></label>' +
@@ -1822,10 +1831,12 @@
         var form = document.getElementById('backtest-form');
         var strategySelect = document.getElementById('config-strategy');
         var paramsSma = document.getElementById('params-sma');
+        var paramsTbill = document.getElementById('params-tbill');
         var paramsVix = document.getElementById('params-vix');
         function toggleParams() {
           var s = strategySelect ? strategySelect.value : 'sma200';
           if (paramsSma) paramsSma.classList.toggle('visible', s === 'sma200' || s === 'sma50');
+          if (paramsTbill) paramsTbill.classList.toggle('visible', s === 'sma50_200_tbill');
           if (paramsVix) paramsVix.classList.toggle('visible', s === 'vix');
           var periodInput = document.getElementById('config-sma-period');
           if (periodInput) periodInput.value = s === 'sma50' ? 50 : 200;
@@ -1858,6 +1869,9 @@
         var params = new URLSearchParams({ start: start, end: end, strategy: strategy, capital: String(capital) });
         if (strategy === 'sma200' || strategy === 'sma50') {
           if (smaPeriodEl) params.set('sma_period', smaPeriodEl.value);
+        } else if (strategy === 'sma50_200_tbill') {
+          var tbillEl = document.getElementById('config-tbill-rate');
+          if (tbillEl) params.set('tbill_annual_rate', tbillEl.value);
         } else if (strategy === 'vix') {
           if (vixThresholdEl) params.set('vix_threshold', vixThresholdEl.value);
           if (buyDollarsEl) params.set('buy_dollars', buyDollarsEl.value);
