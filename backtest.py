@@ -53,6 +53,149 @@ def fetch_data(start_date, end_date, ticker='SPY'):
     )
     return df.dropna()
 
+
+def fetch_data_allweather(start_date, end_date):
+    """Fetch SPY, TLT, IEF, GLD, BIL, VIX for All-Weather strategy. Returns aligned DataFrame."""
+    start = pd.to_datetime(start_date)
+    end = pd.to_datetime(end_date)
+    fetch_start = start - pd.Timedelta(days=252 * 6)
+    tickers = ['SPY', 'TLT', 'IEF', 'GLD', 'BIL', '^VIX']
+    raw = yf.download(tickers, start=fetch_start, end=end, progress=False, auto_adjust=True, threads=False, group_by='column')
+    if raw.empty or len(raw) < 2:
+        raise ValueError("No or insufficient data for All-Weather universe")
+    # Default group_by='column' -> (Close, SPY), (Close, TLT), ...
+    if isinstance(raw.columns, pd.MultiIndex):
+        close_df = raw['Close'].copy() if 'Close' in raw.columns.get_level_values(0) else None
+        if close_df is None:
+            close_df = pd.DataFrame(index=raw.index)
+            for col in raw.columns:
+                if len(col) >= 2 and str(col[1]).lower() == 'close':
+                    close_df[col[0]] = raw[col]
+        col_map = {'SPY': 'spy_close', 'TLT': 'tlt_close', 'IEF': 'ief_close', 'GLD': 'gld_close', 'BIL': 'bil_close', '^VIX': 'vix_close'}
+        close_df = close_df.rename(columns=col_map)
+    else:
+        # Single ticker style
+        close_df = raw[['Close']].copy()
+        close_df.columns = ['spy_close']
+    needed = ['spy_close', 'tlt_close', 'ief_close', 'gld_close', 'bil_close', 'vix_close']
+    missing = [n for n in needed if n not in close_df.columns]
+    if missing:
+        raise ValueError("Missing All-Weather series: %s; got %s" % (missing, list(close_df.columns)))
+    df = close_df[needed].copy().dropna(how='any')
+    if len(df) < 252:
+        raise ValueError("Need at least 252 days of data for All-Weather")
+    return df
+
+
+# All-Weather regime allocation targets (max 70% per asset; these are within limit)
+ALLWEATHER_RISK_ON = {'SPY': 0.70, 'IEF': 0.15, 'GLD': 0.10, 'BIL': 0.05, 'TLT': 0.0}
+ALLWEATHER_NEUTRAL = {'SPY': 0.40, 'IEF': 0.25, 'GLD': 0.20, 'BIL': 0.15, 'TLT': 0.0}
+ALLWEATHER_RISK_OFF = {'SPY': 0.0, 'IEF': 0.10, 'GLD': 0.25, 'BIL': 0.25, 'TLT': 0.40}
+
+
+def backtest_allweather(df, initial_capital=10000, cost_bps=20):
+    """
+    All-Weather Regime-Adaptive: SPY, TLT, IEF, GLD, BIL. Monthly rebalance, 20 bps cost.
+    Regime: Risk-On (bullish, low vol), Neutral, Risk-Off (bonds/gold outperforming).
+    """
+    df = df.copy()
+    # Use prior-close signals; rebalance at start of next month (first trading day of month)
+    df['spy_returns'] = df['spy_close'].pct_change().fillna(0)
+    df['tlt_returns'] = df['tlt_close'].pct_change().fillna(0)
+    df['ief_returns'] = df['ief_close'].pct_change().fillna(0)
+    df['gld_returns'] = df['gld_close'].pct_change().fillna(0)
+    df['bil_returns'] = df['bil_close'].pct_change().fillna(0)
+
+    sma200 = df['spy_close'].rolling(200, min_periods=200).mean()
+    sma200_slope = sma200.diff(21).fillna(0)  # 21-day slope
+    spy_vol_20d = df['spy_close'].pct_change().rolling(20, min_periods=20).std() * np.sqrt(252) * 100  # annualized % vol
+    roll_5y = 252 * 5
+    vol_75th = spy_vol_20d.rolling(roll_5y, min_periods=252).quantile(0.75)
+    vol_75th = vol_75th.fillna(spy_vol_20d.quantile(0.75))  # fallback if < 1Y data
+    ret_50_spy = df['spy_close'].pct_change(50)
+    ret_50_tlt = df['tlt_close'].pct_change(50)
+    ret_50_gld = df['gld_close'].pct_change(50)
+
+    bullish = (df['spy_close'] > sma200) & (sma200_slope > 0)
+    high_vol = (df['vix_close'] > 20) | (spy_vol_20d > vol_75th)
+    risk_off_confirm = (ret_50_tlt > ret_50_spy) | (ret_50_gld > ret_50_spy)
+
+    # Regime: Risk-Off if confirmed; else Risk-On if bullish and not high_vol; else Neutral
+    regime = pd.Series('Neutral', index=df.index)
+    regime.loc[risk_off_confirm] = 'Risk-Off'
+    regime.loc[bullish & ~high_vol & ~risk_off_confirm] = 'Risk-On'
+
+    # Monthly rebalance: first trading day of each month
+    months_seen = set()
+    rebalance_dates = []
+    for i in range(len(df)):
+        ts = df.index[i]
+        key = (ts.year, ts.month)
+        if key not in months_seen:
+            months_seen.add(key)
+            rebalance_dates.append(ts)
+    rebalance_set = set(rebalance_dates)
+
+    cost_frac = cost_bps / 10000.0
+    assets = ['SPY', 'TLT', 'IEF', 'GLD', 'BIL']
+    portfolio_value = [float(initial_capital)]
+    current_weights = {a: 0.0 for a in assets}
+    # Start Neutral until first rebalance
+    current_weights['SPY'] = 0.40
+    current_weights['IEF'] = 0.25
+    current_weights['GLD'] = 0.20
+    current_weights['BIL'] = 0.15
+    current_weights['TLT'] = 0.0
+
+    for i in range(1, len(df)):
+        prev_val = portfolio_value[-1]
+        date = df.index[i]
+        # Daily return = sum(weight * asset_return)
+        ret_spy = df['spy_returns'].iloc[i]
+        ret_tlt = df['tlt_returns'].iloc[i]
+        ret_ief = df['ief_returns'].iloc[i]
+        ret_gld = df['gld_returns'].iloc[i]
+        ret_bil = df['bil_returns'].iloc[i]
+        daily_ret = (
+            current_weights['SPY'] * ret_spy +
+            current_weights['TLT'] * ret_tlt +
+            current_weights['IEF'] * ret_ief +
+            current_weights['GLD'] * ret_gld +
+            current_weights['BIL'] * ret_bil
+        )
+        new_val = prev_val * (1 + daily_ret)
+
+        if date in rebalance_set:
+            idx = df.index.get_loc(date)
+            r = regime.iloc[idx]
+            if r == 'Risk-On':
+                tgt = ALLWEATHER_RISK_ON.copy()
+            elif r == 'Risk-Off':
+                tgt = ALLWEATHER_RISK_OFF.copy()
+            else:
+                tgt = ALLWEATHER_NEUTRAL.copy()
+            for a in tgt:
+                tgt[a] = min(tgt[a], 0.70)
+            # Turnover: sum of |new - old|
+            turnover = sum(abs(tgt.get(a, 0) - current_weights.get(a, 0)) for a in assets)
+            new_val -= cost_frac * turnover * new_val
+            current_weights = tgt.copy()
+
+        portfolio_value.append(max(0, new_val))
+
+    df = df.loc[df.index[0]:]  # ensure alignment
+    df['strategy_portfolio'] = portfolio_value
+    df['spy_cumulative'] = (1 + df['spy_returns']).cumprod()
+    df['spy_portfolio'] = float(initial_capital) * df['spy_cumulative']
+    df['strategy_returns'] = pd.Series(portfolio_value, index=df.index).pct_change().fillna(0)
+    df['spy_peak'] = df['spy_portfolio'].cummax()
+    df['strategy_peak'] = df['strategy_portfolio'].cummax()
+    df['spy_drawdown'] = (df['spy_portfolio'] - df['spy_peak']) / df['spy_peak'] * 100
+    df['strategy_drawdown'] = (df['strategy_portfolio'] - df['strategy_peak']) / df['strategy_peak'] * 100
+    df['position'] = 1.0  # always invested
+    return df
+
+
 def backtest_vix_strategy(df, initial_capital=100000, vix_buy_above=30, buy_dollars=1000):
     """
     Every day VIX (prior close) > threshold, buy $buy_dollars at next open. No selling.
@@ -507,18 +650,22 @@ def run_backtest_custom(start_date_str, end_date_str, strategy='sma200', initial
     """
     Run a backtest over a custom date range with chosen strategy and params.
     start_date_str, end_date_str: 'YYYY-MM-DD'
-    strategy: 'sma200', 'sma50', 'vix', 'sma50_200_tbill'
+    strategy: 'sma200', 'sma50', 'vix', 'sma50_200_tbill', 'all_weather'
     Returns same dict shape as run_backtest for dashboard.
     """
     start_date = pd.to_datetime(start_date_str).date()
     end_date = pd.to_datetime(end_date_str).date()
     if start_date >= end_date:
         raise ValueError("start_date must be before end_date")
-    print(f"Fetching data from {start_date} to {end_date}...", file=sys.stderr)
-    df = fetch_data(start_date, end_date)
+    initial_capital = int(initial_capital)
+    if strategy == 'all_weather':
+        print(f"Fetching All-Weather data from {start_date} to {end_date}...", file=sys.stderr)
+        df = fetch_data_allweather(start_date, end_date)
+    else:
+        print(f"Fetching data from {start_date} to {end_date}...", file=sys.stderr)
+        df = fetch_data(start_date, end_date)
     if len(df) < 2:
         raise ValueError("Not enough data in date range")
-    initial_capital = int(initial_capital)
     if strategy == 'sma200':
         print(f"Running SMA{sma_period} backtest (long when close > {sma_period}d SMA)...", file=sys.stderr)
         df = backtest_sma_strategy(df, period=int(sma_period), initial_capital=initial_capital)
@@ -537,8 +684,12 @@ def run_backtest_custom(start_date_str, end_date_str, strategy='sma200', initial
         print(f"Running SMA50/200 + T-bills (long when Close>SMA50 and SMA50>SMA200; else T-bills at {rate*100:.1f}%)...", file=sys.stderr)
         df = backtest_sma50_200_tbill(df, initial_capital=initial_capital, tbill_annual_rate=rate)
         config = {'strategy': 'sma50_200_tbill', 'tbill_annual_rate_pct': round(rate * 100, 2)}
+    elif strategy == 'all_weather':
+        print("Running All-Weather Regime-Adaptive (SPY/TLT/IEF/GLD/BIL, monthly rebalance, 20 bps)...", file=sys.stderr)
+        df = backtest_allweather(df, initial_capital=initial_capital, cost_bps=20)
+        config = {'strategy': 'all_weather', 'cost_bps': 20}
     else:
-        raise ValueError("strategy must be sma200, sma50, vix, or sma50_200_tbill")
+        raise ValueError("strategy must be sma200, sma50, vix, sma50_200_tbill, or all_weather")
     metrics = calculate_metrics(df)
     charts = prepare_chart_data(df)
     config['start_date'] = df.index[0].strftime('%Y-%m-%d')
@@ -604,7 +755,7 @@ if __name__ == "__main__":
     parser.add_argument('mode', nargs='?', default='vix', help='vix | sma200 | compare')
     parser.add_argument('--start', type=str, help='Start date YYYY-MM-DD (custom run)')
     parser.add_argument('--end', type=str, help='End date YYYY-MM-DD (custom run)')
-    parser.add_argument('--strategy', type=str, default='sma200', choices=['sma200', 'sma50', 'vix', 'sma50_200_tbill'], help='Strategy for custom run')
+    parser.add_argument('--strategy', type=str, default='sma200', choices=['sma200', 'sma50', 'vix', 'sma50_200_tbill', 'all_weather'], help='Strategy for custom run')
     parser.add_argument('--capital', type=int, default=10000, help='Initial capital for custom run')
     parser.add_argument('--sma-period', type=int, default=200, help='SMA period for sma200 strategy')
     parser.add_argument('--vix-threshold', type=int, default=30, help='VIX threshold for vix strategy')

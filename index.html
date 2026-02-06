@@ -841,6 +841,7 @@
               <option value="sma200">Go With the Flow</option>
               <option value="sma50_200_tbill">Stay In or Step Out</option>
               <option value="vix">Buy the Panic</option>
+              <option value="all_weather">All-Weather Regime-Adaptive</option>
             </select>
           </label>
           <div class="strategy-description" id="strategy-description" aria-live="polite"></div>
@@ -2003,6 +2004,10 @@
         vix: {
           tagline: 'Looks for opportunity when market fear spikes.',
           math: 'Each day: if VIX &gt; threshold, buy $X of SPY. No selling; position mark-to-market. Accumulates exposure on high-fear days.'
+        },
+        all_weather: {
+          tagline: 'Regime-adaptive mix of stocks, bonds, gold, and cash.',
+          math: 'Universe: SPY, TLT, IEF, GLD, BIL. Monthly rebalance, 20 bps cost. Regime: Bullish (SPY&gt;200D SMA, slope&gt;0), High vol (VIX&gt;20 or SPY 20D vol&gt;75th pct), Risk-off (TLT or GLD 50D return &gt; SPY). Risk-On: 70% SPY, 15% IEF, 10% GLD, 5% BIL. Neutral: 40% SPY, 25% IEF, 20% GLD, 15% BIL. Risk-Off: 40% TLT, 25% GLD, 25% BIL, 10% IEF. Max 70% per asset. Results are sensitive to lookback windows (200D, 20D vol, 50D returns, 5Y vol percentile).'
         }
       };
 
@@ -2020,6 +2025,9 @@
           var buy = buyEl ? Number(buyEl.value) || 1000 : 1000;
           var vixTh = vixEl ? Number(vixEl.value) : 30;
           return 'Start $' + capStr + '. Buy $' + buy.toLocaleString() + ' of SPY every day VIX is above ' + vixTh + '. No selling.';
+        }
+        if (strategy === 'all_weather') {
+          return 'Universe: SPY, TLT, IEF, GLD, BIL. Monthly rebalance, 20 bps. Regime: Risk-On (bullish, low vol), Neutral, Risk-Off (TLT/GLD 50D &gt; SPY). Allocations: Risk-On 70/15/10/5 SPY/IEF/GLD/BIL; Neutral 40/25/20/15; Risk-Off 40% TLT, 25% GLD, 25% BIL, 10% IEF. Start $' + capStr + '.';
         }
         if (strategy === 'sma50_200_tbill') {
           var tbill = tbillEl ? Number(tbillEl.value) : 4;
@@ -2054,6 +2062,7 @@
           if (paramsVix) paramsVix.classList.toggle('visible', s === 'vix');
           updateStrategyDescription();
         }
+        // all_weather has no extra params
         if (strategySelect) strategySelect.addEventListener('change', toggleParams);
         toggleParams();
         ['config-capital', 'config-sma-period', 'config-tbill-rate', 'config-vix-threshold', 'config-buy-dollars'].forEach(function (id) {

@@ -29,7 +29,7 @@ class handler(BaseHTTPRequestHandler):
                 self.wfile.write(json.dumps({"error": "start and end (YYYY-MM-DD) required"}).encode("utf-8"))
                 return
             strategy = (qs.get("strategy") or ["sma200"])[0]
-            if strategy not in ("sma200", "sma50", "vix", "sma50_200_tbill"):
+            if strategy not in ("sma200", "sma50", "vix", "sma50_200_tbill", "all_weather"):
                 strategy = "sma200"
             capital = int((qs.get("capital") or ["10000"])[0])
             sma_period = int((qs.get("sma_period") or ["200"])[0])
