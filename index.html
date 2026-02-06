@@ -52,9 +52,30 @@
     }
 
     /* Hero */
-    .hero {
+    .hero-wrap {
       padding: 4rem 0 3rem;
+      transition: padding 0.5s ease;
+    }
+    .hero-wrap.hero-wrap--split {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 2.5rem;
+      align-items: start;
+      padding: 3rem 0 3rem;
+      max-width: 100%;
+    }
+    @media (max-width: 720px) {
+      .hero-wrap.hero-wrap--split {
+        grid-template-columns: 1fr;
+      }
+    }
+    .hero {
+      padding: 0;
       text-align: center;
+      transition: text-align 0.5s ease;
+    }
+    .hero-wrap--split .hero {
+      text-align: left;
     }
 
     .hero h1 {
@@ -138,6 +159,36 @@
       color: var(--muted);
       max-width: 360px;
       margin: 0.5rem auto 0;
+    }
+    .hero-wrap--split .hero .hero-tagline {
+      margin-left: 0;
+      max-width: none;
+    }
+    .hero-definition-panel {
+      overflow: hidden;
+      max-height: 0;
+      opacity: 0;
+      transition: max-height 0.6s ease, opacity 0.5s ease;
+    }
+    .hero-wrap--split .hero-definition-panel {
+      max-height: 280px;
+      opacity: 1;
+    }
+    .hero-definition-text {
+      font-size: 0.95rem;
+      line-height: 1.6;
+      color: var(--muted);
+      margin: 0;
+      font-style: italic;
+    }
+    .typewriter-caret {
+      display: inline-block;
+      color: var(--accent);
+      animation: blink-caret 0.9s step-end infinite;
+      margin-left: 1px;
+    }
+    @keyframes blink-caret {
+      50% { opacity: 0; }
     }
 
     /* Strategy cards */
@@ -642,24 +693,6 @@
       font-family: 'JetBrains Mono', monospace;
       font-size: 0.85rem;
     }
-    .date-parts {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.2rem;
-    }
-    .date-parts input {
-      width: 3.5ch;
-      text-align: center;
-    }
-    .date-parts input[name="start_year"],
-    .date-parts input[name="end_year"] {
-      width: 5ch;
-    }
-    .date-sep {
-      color: var(--muted);
-      font-weight: 600;
-      user-select: none;
-    }
     .backtest-config select:focus,
     .backtest-config input:focus {
       outline: none;
@@ -793,10 +826,16 @@
 </head>
 <body>
   <div class="page">
-    <header class="hero">
-      <h1>Policy<span class="hero-fn"><span class="hero-fn-full">Function</span><span class="hero-fn-math">f(x)</span></span></h1>
-      <p class="hero-tagline">Backtest your strategies — set dates, run, replay.</p>
-    </header>
+    <div class="hero-wrap" id="hero-wrap">
+      <header class="hero">
+        <h1>Policy<span class="hero-fn"><span class="hero-fn-full">Function</span><span class="hero-fn-math">f(x)</span></span></h1>
+        <p class="hero-tagline">A research platform for systematic strategy design and backtesting.</p>
+      </header>
+      <div class="hero-definition-panel" id="hero-definition-panel" aria-live="polite">
+        <p class="hero-definition-text" id="hero-definition-text"></p>
+        <span class="typewriter-caret" id="typewriter-caret" aria-hidden="true">|</span>
+      </div>
+    </div>
 
     <section class="backtest-config" id="backtest-config">
       <h2>Backtest setup</h2>
@@ -813,23 +852,11 @@
           <p class="strategy-description" id="strategy-description" aria-live="polite">Systematic time-series momentum filter to condition equity exposure on prevailing market trends.</p>
           <label>
             Start date
-            <span class="date-parts" aria-label="Start date: month, day, year">
-              <input type="number" id="config-start-month" name="start_month" min="1" max="12" placeholder="MM" aria-label="Start month" inputmode="numeric" />
-              <span class="date-sep">/</span>
-              <input type="number" id="config-start-day" name="start_day" min="1" max="31" placeholder="DD" aria-label="Start day" inputmode="numeric" />
-              <span class="date-sep">/</span>
-              <input type="number" id="config-start-year" name="start_year" min="1990" max="2030" placeholder="YYYY" aria-label="Start year" inputmode="numeric" />
-            </span>
+            <input type="date" id="config-start" name="start" required />
           </label>
           <label>
             End date
-            <span class="date-parts" aria-label="End date: month, day, year">
-              <input type="number" id="config-end-month" name="end_month" min="1" max="12" placeholder="MM" aria-label="End month" inputmode="numeric" />
-              <span class="date-sep">/</span>
-              <input type="number" id="config-end-day" name="end_day" min="1" max="31" placeholder="DD" aria-label="End day" inputmode="numeric" />
-              <span class="date-sep">/</span>
-              <input type="number" id="config-end-year" name="end_year" min="1990" max="2030" placeholder="YYYY" aria-label="End year" inputmode="numeric" />
-            </span>
+            <input type="date" id="config-end" name="end" required />
           </label>
           <label>
             Initial capital ($)
@@ -1856,42 +1883,27 @@
       }
 
       function setDefaultDates() {
+        var endEl = document.getElementById('config-end');
+        var startEl = document.getElementById('config-start');
+        if (!endEl || !startEl) return;
         var end = new Date();
         var start = new Date(end);
         start.setFullYear(start.getFullYear() - 5);
-        setDateParts('config-start', start.getMonth() + 1, start.getDate(), start.getFullYear());
-        setDateParts('config-end', end.getMonth() + 1, end.getDate(), end.getFullYear());
+        endEl.value = end.toISOString().slice(0, 10);
+        startEl.value = start.toISOString().slice(0, 10);
         syncDateConstraints();
       }
 
-      function setDateParts(prefix, month, day, year) {
-        var m = document.getElementById(prefix + '-month');
-        var d = document.getElementById(prefix + '-day');
-        var y = document.getElementById(prefix + '-year');
-        if (m) m.value = month;
-        if (d) d.value = day;
-        if (y) y.value = year;
-      }
-
-      function getDateString(prefix) {
-        var m = document.getElementById(prefix + '-month');
-        var d = document.getElementById(prefix + '-day');
-        var y = document.getElementById(prefix + '-year');
-        if (!m || !d || !y) return '';
-        var month = parseInt(m.value, 10);
-        var day = parseInt(d.value, 10);
-        var year = parseInt(y.value, 10);
-        if (isNaN(month) || isNaN(day) || isNaN(year)) return '';
-        var pad = function (n) { return n < 10 ? '0' + n : String(n); };
-        return year + '-' + pad(month) + '-' + pad(day);
-      }
-
       function syncDateConstraints() {
-        var today = new Date();
-        var endYear = document.getElementById('config-end-year');
-        var startYear = document.getElementById('config-start-year');
-        if (endYear) endYear.setAttribute('max', today.getFullYear());
-        if (startYear && endYear && endYear.value) startYear.setAttribute('max', endYear.value);
+        var startEl = document.getElementById('config-start');
+        var endEl = document.getElementById('config-end');
+        if (!startEl || !endEl) return;
+        var today = new Date().toISOString().slice(0, 10);
+        var startVal = startEl.value;
+        var endVal = endEl.value;
+        startEl.setAttribute('max', endVal || today);
+        endEl.setAttribute('min', startVal || '');
+        endEl.setAttribute('max', today);
       }
 
       function setupBacktestForm() {
@@ -1917,13 +1929,15 @@
         toggleParams();
         if (form) form.addEventListener('submit', function (e) { e.preventDefault(); runBacktestFromForm(); });
         syncDateConstraints();
-        ['config-start-month', 'config-start-day', 'config-start-year', 'config-end-month', 'config-end-day', 'config-end-year'].forEach(function (id) {
-          var el = document.getElementById(id);
-          if (el) { el.addEventListener('input', syncDateConstraints); el.addEventListener('change', syncDateConstraints); }
-        });
+        var startInput = document.getElementById('config-start');
+        var endInput = document.getElementById('config-end');
+        if (startInput) { startInput.addEventListener('input', syncDateConstraints); startInput.addEventListener('change', syncDateConstraints); }
+        if (endInput) { endInput.addEventListener('input', syncDateConstraints); endInput.addEventListener('change', syncDateConstraints); }
       }
 
       function runBacktestFromForm() {
+        var startEl = document.getElementById('config-start');
+        var endEl = document.getElementById('config-end');
         var strategyEl = document.getElementById('config-strategy');
         var capitalEl = document.getElementById('config-capital');
         var smaPeriodEl = document.getElementById('config-sma-period');
@@ -1932,17 +1946,11 @@
         var btn = document.getElementById('btn-run-backtest');
         var msgEl = document.getElementById('backtest-msg');
         var target = document.getElementById('sma200-content');
-        if (!strategyEl) return;
-        var start = getDateString('config-start');
-        var end = getDateString('config-end');
+        if (!startEl || !endEl || !strategyEl) return;
+        var start = startEl.value;
+        var end = endEl.value;
         if (!start || !end) {
-          if (msgEl) { msgEl.textContent = 'Please set start and end dates (month, day, year).'; msgEl.className = 'load-msg error'; }
-          return;
-        }
-        var startD = new Date(start);
-        var endD = new Date(end);
-        if (isNaN(startD.getTime()) || isNaN(endD.getTime())) {
-          if (msgEl) { msgEl.textContent = 'Invalid date (e.g. use month 1–12, day 1–31).'; msgEl.className = 'load-msg error'; }
+          if (msgEl) { msgEl.textContent = 'Please set start and end dates.'; msgEl.className = 'load-msg error'; }
           return;
         }
         if (start > end) {
@@ -2215,6 +2223,27 @@
           .catch(function () { if (el) el.innerHTML = '<p class="load-state">Strategy study unavailable. Start the server with <code>./run.sh</code> and refresh.</p>'; });
       }
 
+      var HERO_DEFINITION = 'A policy function, denoted as \u03C0(s), is a fundamental concept in reinforcement learning and optimal control theory that defines the decision-making strategy of an agent.';
+
+      function runHeroDefinitionSequence() {
+        var wrap = document.getElementById('hero-wrap');
+        var textEl = document.getElementById('hero-definition-text');
+        var caretEl = document.getElementById('typewriter-caret');
+        if (!wrap || !textEl) return;
+        wrap.classList.add('hero-wrap--split');
+        var i = 0;
+        function typeNext() {
+          if (i < HERO_DEFINITION.length) {
+            textEl.textContent += HERO_DEFINITION.charAt(i);
+            i += 1;
+            setTimeout(typeNext, 32);
+          } else {
+            if (caretEl) caretEl.style.visibility = 'hidden';
+          }
+        }
+        typeNext();
+      }
+
       function run() {
         try {
           setDefaultDates();
@@ -2228,6 +2257,7 @@
               sma200Header.setAttribute('aria-expanded', sma200Card.classList.contains('expanded'));
             });
           }
+          setTimeout(runHeroDefinitionSequence, 7000);
         } catch (err) {
           var c = document.getElementById('sma200-content');
           if (c) c.innerHTML = '<p class="error-msg">Dashboard error: ' + String(err && err.message ? err.message : err) + '</p>';
