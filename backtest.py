@@ -55,31 +55,33 @@ def fetch_data(start_date, end_date, ticker='SPY'):
 
 def backtest_vix_strategy(df, initial_capital=100000, vix_buy_above=30, buy_dollars=1000):
     """
-    Start with initial_capital (default 100k). Every day VIX is above 30, buy $buy_dollars of SPY.
-    No selling; position is mark-to-market each day.
+    Every day VIX (prior close) > threshold, buy $buy_dollars at next open. No selling.
+    No lookahead: use VIX[t-1] to decide buy at open[t]. Cost applied on each buy.
     """
     df = df.copy()
     df['spy_returns'] = df['spy_close'].pct_change().fillna(0)
     cash = float(initial_capital)
     spy_value = 0.0
+    pending_buy = 0.0  # decided yesterday, invested at open today
     strategy_values = []
     positions = []
 
     for i in range(len(df)):
+        # Pending buy from yesterday gets invested at open today and earns today's return
+        if pending_buy > 0:
+            spy_value += pending_buy
+            spy_value -= (COST_BPS_ROUND_TRIP / 10000) * pending_buy  # one-way cost on buy
+            pending_buy = 0
         spy_ret = df['spy_returns'].iloc[i]
-        vix = df['vix_close'].iloc[i]
-
-        # Apply SPY return to current position
         if spy_value > 0:
             spy_value = spy_value * (1 + spy_ret)
-
-        # Buy $buy_dollars when VIX > 30 (up to available cash)
-        if vix > vix_buy_above:
+        # Decision at end of day: use today's VIX to decide buy at next open
+        vix_today = df['vix_close'].iloc[i]
+        if vix_today > vix_buy_above:
             amount = min(float(buy_dollars), cash)
             cash -= amount
-            spy_value += amount
-
-        total = cash + spy_value
+            pending_buy = amount  # will be added at start of next day
+        total = cash + spy_value + pending_buy  # pending_buy committed but not yet invested
         strategy_values.append(total)
         positions.append(1 if spy_value > 0 else 0)
 
@@ -96,20 +98,33 @@ def backtest_vix_strategy(df, initial_capital=100000, vix_buy_above=30, buy_doll
     return df
 
 
+# Realism: round-trip cost in bps (spread + slippage + commission proxy)
+COST_BPS_ROUND_TRIP = 10
+
+
 def backtest_sma_strategy(df, period=200, initial_capital=10000):
-    """Long SPY when close > period-day SMA; otherwise cash."""
+    """
+    Long SPY when close > period-day SMA; otherwise cash.
+    No lookahead: signal at close[t-1] -> position at open[t]. Execution at next open.
+    Frictions: COST_BPS_ROUND_TRIP applied on each position change.
+    """
     df = df.copy()
     df['spy_returns'] = df['spy_close'].pct_change().fillna(0)
     sma = df['spy_close'].rolling(period, min_periods=period).mean()
-    position = (df['spy_close'] > sma).astype(int).fillna(0)
-    df['position'] = position
+    # Position at start of day t = signal from end of day t-1 (execute at open[t])
+    signal = (df['spy_close'].shift(1) > sma.shift(1)).astype(int).fillna(0)
+    df['position'] = signal.values
 
     strategy_values = [float(initial_capital)]
     for i in range(1, len(df)):
         prev = strategy_values[-1]
         ret = df['spy_returns'].iloc[i]
         pos = df['position'].iloc[i]
-        strategy_values.append(prev * (1 + ret * pos))
+        pos_prev = df['position'].iloc[i - 1]
+        new_val = prev * (1 + ret * pos)
+        if pos != pos_prev:
+            new_val -= (COST_BPS_ROUND_TRIP / 10000) * new_val
+        strategy_values.append(max(0, new_val))
     df['strategy_portfolio'] = strategy_values
     df['spy_cumulative'] = (1 + df['spy_returns']).cumprod()
     df['spy_portfolio'] = initial_capital * df['spy_cumulative']
@@ -130,15 +145,14 @@ def backtest_sma200_strategy(df, initial_capital=10000):
 def backtest_sma50_200_tbill(df, initial_capital=10000, tbill_annual_rate=0.04):
     """
     Long SPY if Close > SMA(50) AND SMA(50) > SMA(200); otherwise T-bills.
-    tbill_annual_rate: annualized T-bill return (e.g. 0.04 = 4%).
+    No lookahead: signal at close[t-1] -> position at open[t]. Frictions applied.
     """
     df = df.copy()
     df['spy_returns'] = df['spy_close'].pct_change().fillna(0)
     sma50 = df['spy_close'].rolling(50, min_periods=50).mean()
     sma200 = df['spy_close'].rolling(200, min_periods=200).mean()
-    # In market when close > SMA50 and SMA50 > SMA200
-    position = ((df['spy_close'] > sma50) & (sma50 > sma200)).astype(int).fillna(0)
-    df['position'] = position
+    signal = ((df['spy_close'].shift(1) > sma50.shift(1)) & (sma50.shift(1) > sma200.shift(1))).astype(int).fillna(0)
+    df['position'] = signal.values
 
     daily_tbill = (1 + float(tbill_annual_rate)) ** (1 / 252) - 1
     strategy_values = [float(initial_capital)]
@@ -146,9 +160,12 @@ def backtest_sma50_200_tbill(df, initial_capital=10000, tbill_annual_rate=0.04):
         prev = strategy_values[-1]
         ret = df['spy_returns'].iloc[i]
         pos = df['position'].iloc[i]
-        # When in market: SPY return; when out: T-bill return
+        pos_prev = df['position'].iloc[i - 1]
         strategy_ret = ret * pos + daily_tbill * (1 - pos)
-        strategy_values.append(prev * (1 + strategy_ret))
+        new_val = prev * (1 + strategy_ret)
+        if pos != pos_prev:
+            new_val -= (COST_BPS_ROUND_TRIP / 10000) * new_val
+        strategy_values.append(max(0, new_val))
     df['strategy_portfolio'] = strategy_values
     df['spy_cumulative'] = (1 + df['spy_returns']).cumprod()
     df['spy_portfolio'] = initial_capital * df['spy_cumulative']
@@ -162,40 +179,76 @@ def backtest_sma50_200_tbill(df, initial_capital=10000, tbill_annual_rate=0.04):
 
 
 def calculate_metrics(df):
-    """Calculate performance metrics"""
-    
+    """Calculate performance metrics including cost-to-run and risk/stability."""
+    years = max((df.index[-1] - df.index[0]).days / 365.25, 0.01)
+
     # Total returns
     spy_total_return = (df['spy_portfolio'].iloc[-1] / df['spy_portfolio'].iloc[0] - 1) * 100
     strategy_total_return = (df['strategy_portfolio'].iloc[-1] / df['strategy_portfolio'].iloc[0] - 1) * 100
-    
-    # Annualized returns
-    years = (df.index[-1] - df.index[0]).days / 365.25
-    spy_annual = ((df['spy_portfolio'].iloc[-1] / df['spy_portfolio'].iloc[0]) ** (1/years) - 1) * 100
-    strategy_annual = ((df['strategy_portfolio'].iloc[-1] / df['strategy_portfolio'].iloc[0]) ** (1/years) - 1) * 100
-    
-    # Volatility (annualized)
+
+    # CAGR
+    spy_annual = ((df['spy_portfolio'].iloc[-1] / df['spy_portfolio'].iloc[0]) ** (1 / years) - 1) * 100
+    strategy_annual = ((df['strategy_portfolio'].iloc[-1] / df['strategy_portfolio'].iloc[0]) ** (1 / years) - 1) * 100
+
+    # Volatility (annualized %)
     spy_vol = df['spy_returns'].std() * np.sqrt(252) * 100
     strategy_vol = df['strategy_returns'].std() * np.sqrt(252) * 100
-    
-    # Sharpe ratio (assuming 0% risk-free rate)
+    if np.isnan(strategy_vol) or strategy_vol <= 0:
+        strategy_vol = 0
+
+    # Sharpe (0% risk-free)
     spy_sharpe = (df['spy_returns'].mean() / df['spy_returns'].std()) * np.sqrt(252) if df['spy_returns'].std() > 0 else 0
     strategy_sharpe = (df['strategy_returns'].mean() / df['strategy_returns'].std()) * np.sqrt(252) if df['strategy_returns'].std() > 0 else 0
-    
-    # Max drawdown
+
+    # Max drawdown %
     spy_max_dd = df['spy_drawdown'].min()
     strategy_max_dd = df['strategy_drawdown'].min()
-    
-    # Win rate
+
+    # Calmar / MAR = CAGR / |Max DD|
+    strategy_calmar = (strategy_annual / abs(strategy_max_dd)) if strategy_max_dd != 0 else None
+
+    # Worst month / worst day (%)
+    try:
+        monthly_returns = df['strategy_returns'].resample('ME').apply(lambda x: (1 + x).prod() - 1)
+    except Exception:
+        monthly_returns = pd.Series(dtype=float)
+    worst_month = (monthly_returns.min() * 100) if len(monthly_returns) > 0 else None
+    worst_day = (df['strategy_returns'].min() * 100) if len(df) > 0 else None
+
+    # Cost-to-run
+    num_trades = (df['position'].diff() != 0).sum()
+    trades_per_year = num_trades / years
+    days_in_market = (df['position'] == 1).sum()
+    days_in_market_pct = days_in_market / len(df) * 100 if len(df) > 0 else 0
+    n_entries = ((df['position'] == 1) & (df['position'].shift(1) != 1)).sum()
+    if df['position'].iloc[0] == 1:
+        n_entries += 1
+    avg_holding_days = (days_in_market / n_entries) if n_entries > 0 else 0
+    # Annual turnover: sum of |position change| * 100% notional, annualized
+    turn_notional = (df['position'].diff().abs() * df['strategy_portfolio']).sum()
+    avg_aum = df['strategy_portfolio'].mean()
+    annual_turnover_pct = (100 * turn_notional / avg_aum / years) if avg_aum > 0 and years > 0 else 0
+
+    # Win rate (days in market when SPY was up)
     strategy_trades = df[df['position'] == 1]
     win_rate = (strategy_trades['spy_returns'] > 0).sum() / len(strategy_trades) * 100 if len(strategy_trades) > 0 else 0
-    
-    # Number of trades (position changes)
-    num_trades = (df['position'].diff() != 0).sum()
-    
-    # Days in market
-    days_in_market = (df['position'] == 1).sum()
-    days_in_market_pct = days_in_market / len(df) * 100
-    
+
+    # Rolling 12-month Sharpe, drawdown, excess return
+    roll_window = min(252, len(df) - 1)
+    rolling_sharpe = []
+    rolling_dd = []
+    rolling_excess = []
+    for i in range(roll_window, len(df)):
+        window = df.iloc[i - roll_window:i]
+        r = window['strategy_returns']
+        sr = (r.mean() / r.std()) * np.sqrt(252) if r.std() > 0 else 0
+        rolling_sharpe.append({'date': df.index[i].strftime('%Y-%m-%d'), 'sharpe': round(sr, 2)})
+        dd = window['strategy_drawdown'].min()
+        rolling_dd.append({'date': df.index[i].strftime('%Y-%m-%d'), 'drawdown': round(dd, 2)})
+        strat_ret_12 = (window['strategy_portfolio'].iloc[-1] / window['strategy_portfolio'].iloc[0]) - 1
+        spy_ret_12 = (window['spy_portfolio'].iloc[-1] / window['spy_portfolio'].iloc[0]) - 1
+        rolling_excess.append({'date': df.index[i].strftime('%Y-%m-%d'), 'excess_pct': round((strat_ret_12 - spy_ret_12) * 100, 2)})
+
     return {
         'spy_total_return': round(spy_total_return, 2),
         'strategy_total_return': round(strategy_total_return, 2),
@@ -207,12 +260,21 @@ def calculate_metrics(df):
         'strategy_sharpe': round(strategy_sharpe, 2),
         'spy_max_drawdown': round(spy_max_dd, 2),
         'strategy_max_drawdown': round(strategy_max_dd, 2),
+        'strategy_calmar': round(strategy_calmar, 2) if strategy_calmar is not None else None,
+        'worst_month_pct': round(worst_month, 2) if worst_month is not None else None,
+        'worst_day_pct': round(worst_day, 2) if worst_day is not None else None,
         'win_rate': round(win_rate, 2),
         'num_trades': int(num_trades),
+        'trades_per_year': round(trades_per_year, 1),
+        'avg_holding_period_days': round(avg_holding_days, 1),
+        'annual_turnover_pct': round(annual_turnover_pct, 1),
         'days_in_market': int(days_in_market),
         'days_in_market_pct': round(days_in_market_pct, 2),
         'final_spy_value': round(df['spy_portfolio'].iloc[-1], 2),
-        'final_strategy_value': round(df['strategy_portfolio'].iloc[-1], 2)
+        'final_strategy_value': round(df['strategy_portfolio'].iloc[-1], 2),
+        'rolling_12m_sharpe': rolling_sharpe[-24:] if len(rolling_sharpe) > 24 else rolling_sharpe,  # last 24 months
+        'rolling_12m_drawdown': rolling_dd[-24:] if len(rolling_dd) > 24 else rolling_dd,
+        'rolling_12m_excess_vs_spy': rolling_excess[-24:] if len(rolling_excess) > 24 else rolling_excess,
     }
 
 def prepare_chart_data(df):

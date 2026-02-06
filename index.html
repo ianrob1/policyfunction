@@ -502,6 +502,21 @@
     .metric:hover {
       background: rgba(255, 255, 255, 0.02);
     }
+    .metrics-section {
+      margin-bottom: 1.25rem;
+    }
+    .metrics-section-title {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 0.5rem;
+    }
+    .metrics-grid-tight {
+      grid-template-columns: repeat(4, 1fr);
+    }
+    .metrics-grid-tight .metric { min-height: 56px; }
+    .metric-wide { grid-column: span 2; }
 
     .metric-label {
       font-size: 0.65rem;
@@ -1027,8 +1042,38 @@
         set('metric-sharpe', m.strategy_sharpe != null ? m.strategy_sharpe.toFixed(2) : '—');
         set('metric-win-rate', m.win_rate != null ? m.win_rate.toFixed(1) + '%' : '—');
         set('metric-days-market', (m.days_in_market ?? '—') + ' (' + (m.days_in_market_pct ?? 0).toFixed(1) + '%)');
+        set('metric-trades-per-year', m.trades_per_year != null ? m.trades_per_year.toFixed(1) : '—');
+        set('metric-avg-holding', m.avg_holding_period_days != null ? m.avg_holding_period_days.toFixed(0) + ' days' : '—');
+        set('metric-turnover', m.annual_turnover_pct != null ? m.annual_turnover_pct.toFixed(1) + '%' : '—');
+        set('metric-time-in-market', m.days_in_market_pct != null ? m.days_in_market_pct.toFixed(1) + '%' : '—');
+        set('metric-volatility', m.strategy_volatility != null ? m.strategy_volatility.toFixed(2) + '%' : '—');
+        set('metric-calmar', m.strategy_calmar != null ? m.strategy_calmar.toFixed(2) : '—');
+        set('metric-worst-month', m.worst_month_pct != null ? formatPct(m.worst_month_pct) : '—');
+        set('metric-worst-day', m.worst_day_pct != null ? formatPct(m.worst_day_pct) : '—');
+        set('metric-rolling-sharpe', m.rolling_12m_sharpe && m.rolling_12m_sharpe.length ? (function () {
+          var vals = m.rolling_12m_sharpe.map(function (x) { return x.sharpe; });
+          var min = Math.min.apply(null, vals);
+          var mean = vals.reduce(function (a, b) { return a + b; }, 0) / vals.length;
+          return 'min ' + min.toFixed(2) + ', avg ' + mean.toFixed(2);
+        }()) : '—');
+        set('metric-rolling-excess', m.rolling_12m_excess_vs_spy && m.rolling_12m_excess_vs_spy.length ? (function () {
+          var vals = m.rolling_12m_excess_vs_spy.map(function (x) { return x.excess_pct; });
+          return 'min ' + Math.min.apply(null, vals).toFixed(1) + '%, avg ' + (vals.reduce(function (a, b) { return a + b; }, 0) / vals.length).toFixed(1) + '%';
+        }()) : '—');
       }
 
+      function rollSummary(arr, key) {
+        if (!arr || !arr.length) return '—';
+        var vals = arr.map(function (x) { return x[key]; });
+        var min = Math.min.apply(null, vals);
+        var avg = vals.reduce(function (a, b) { return a + b; }, 0) / vals.length;
+        return 'min ' + min.toFixed(2) + ', avg ' + avg.toFixed(2);
+      }
+      function rollExcessSummary(arr) {
+        if (!arr || !arr.length) return '—';
+        var vals = arr.map(function (x) { return x.excess_pct; });
+        return 'min ' + Math.min.apply(null, vals).toFixed(1) + '%, avg ' + (vals.reduce(function (a, b) { return a + b; }, 0) / vals.length).toFixed(1) + '%';
+      }
       function renderMetrics(metrics) {
         if (!metrics) return '';
         const m = metrics;
@@ -1065,6 +1110,56 @@
             <div class="metric">
               <div class="metric-label">Days in market</div>
               <div class="metric-value" id="metric-days-market">${m.days_in_market ?? '—'} (${(m.days_in_market_pct ?? 0).toFixed(1)}%)</div>
+            </div>
+          </div>
+          <div class="metrics-section">
+            <div class="metrics-section-title">Cost to run</div>
+            <div class="metrics-grid metrics-grid-tight">
+              <div class="metric">
+                <div class="metric-label">Trades per year</div>
+                <div class="metric-value" id="metric-trades-per-year">${m.trades_per_year != null ? m.trades_per_year.toFixed(1) : '—'}</div>
+              </div>
+              <div class="metric">
+                <div class="metric-label">Avg holding period</div>
+                <div class="metric-value" id="metric-avg-holding">${m.avg_holding_period_days != null ? m.avg_holding_period_days.toFixed(0) + ' days' : '—'}</div>
+              </div>
+              <div class="metric">
+                <div class="metric-label">Annual turnover</div>
+                <div class="metric-value" id="metric-turnover">${m.annual_turnover_pct != null ? m.annual_turnover_pct.toFixed(1) + '%' : '—'}</div>
+              </div>
+              <div class="metric">
+                <div class="metric-label">% time in market</div>
+                <div class="metric-value" id="metric-time-in-market">${m.days_in_market_pct != null ? m.days_in_market_pct.toFixed(1) + '%' : '—'}</div>
+              </div>
+            </div>
+          </div>
+          <div class="metrics-section">
+            <div class="metrics-section-title">Risk & stability</div>
+            <div class="metrics-grid metrics-grid-tight">
+              <div class="metric">
+                <div class="metric-label">Volatility (ann.)</div>
+                <div class="metric-value" id="metric-volatility">${m.strategy_volatility != null ? m.strategy_volatility.toFixed(2) + '%' : '—'}</div>
+              </div>
+              <div class="metric">
+                <div class="metric-label">Calmar (CAGR/|Max DD|)</div>
+                <div class="metric-value" id="metric-calmar">${m.strategy_calmar != null ? m.strategy_calmar.toFixed(2) : '—'}</div>
+              </div>
+              <div class="metric">
+                <div class="metric-label">Worst month</div>
+                <div class="metric-value negative" id="metric-worst-month">${m.worst_month_pct != null ? formatPct(m.worst_month_pct) : '—'}</div>
+              </div>
+              <div class="metric">
+                <div class="metric-label">Worst day</div>
+                <div class="metric-value negative" id="metric-worst-day">${m.worst_day_pct != null ? formatPct(m.worst_day_pct) : '—'}</div>
+              </div>
+              <div class="metric metric-wide">
+                <div class="metric-label">Rolling 12m Sharpe</div>
+                <div class="metric-value" id="metric-rolling-sharpe">${m.rolling_12m_sharpe && m.rolling_12m_sharpe.length ? rollSummary(m.rolling_12m_sharpe, 'sharpe') : '—'}</div>
+              </div>
+              <div class="metric metric-wide">
+                <div class="metric-label">Rolling 12m excess vs SPY</div>
+                <div class="metric-value" id="metric-rolling-excess">${m.rolling_12m_excess_vs_spy && m.rolling_12m_excess_vs_spy.length ? rollExcessSummary(m.rolling_12m_excess_vs_spy) : '—'}</div>
+              </div>
             </div>
           </div>
         `;
