@@ -186,44 +186,55 @@ def backtest_sma200_strategy(df, initial_capital=10000):
 
 def backtest_sma50_200_tbill(df, initial_capital=10000, tbill_annual_rate=0.04):
     """
-    Stay In or Step Out: Long SPY if Close > SMA(50) and SMA(50) > SMA(200); otherwise T-bills.
-    Dip-buy: When bearish (Close < SMA50), allocate 50% SPY when RSI(14)<30 or price >10% below SMA50.
-    Exit dip-buy when RSI>50 or price crosses back above SMA50.
-    No lookahead: signal at close[t-1] -> position at open[t]. Frictions applied.
+    Stay In or Step Out:
+    Entry: 100% SPY when Close > SMA(50) and SMA(50) > SMA(200); sticky 100% when long and Close > SMA(100).
+            75% SPY when bearish and RSI < 35; 50% SPY when bearish and (RSI < 30 or Close >10% below SMA50).
+    Exit: From 100% only when Close < SMA(100). From dip-buy when RSI > 55.
+    Cash: T-bills when no long conditions met. No lookahead; frictions applied.
     """
     df = df.copy()
     df['spy_returns'] = df['spy_close'].pct_change().fillna(0)
     sma50 = df['spy_close'].rolling(50, min_periods=50).mean()
+    sma100 = df['spy_close'].rolling(100, min_periods=100).mean()
     sma200 = df['spy_close'].rolling(200, min_periods=200).mean()
     rsi = _rsi(df['spy_close'], 14)
     cl = df['spy_close'].shift(1)
     sma50_prev = sma50.shift(1)
+    sma100_prev = sma100.shift(1)
     sma200_prev = sma200.shift(1)
     rsi_prev = rsi.shift(1)
-    trend_long = (cl > sma50_prev) & (sma50_prev > sma200_prev)
-    trend_long = trend_long.fillna(False)
-    bearish = (cl < sma50_prev).fillna(False)
-    dip_trigger = bearish & ((rsi_prev < 30) | (cl < 0.9 * sma50_prev))
-    dip_exit = (rsi_prev > 50) | (cl > sma50_prev)
-    in_dip = []
-    for i in range(len(df)):
-        if i == 0:
-            in_dip.append(False)
-            continue
-        was_dip = in_dip[-1]
-        if trend_long.iloc[i]:
-            in_dip.append(False)
-        elif was_dip and dip_exit.iloc[i]:
-            in_dip.append(False)
-        elif dip_trigger.iloc[i]:
-            in_dip.append(True)
-        elif was_dip:
-            in_dip.append(True)
+    bearish = (cl < sma50_prev).fillna(True)
+    primary_trend = (cl > sma50_prev) & (sma50_prev > sma200_prev)
+    primary_trend = primary_trend.fillna(False)
+    # Position: 0, 0.5, 0.75, 1.0
+    positions = [0.0]
+    for i in range(1, len(df)):
+        prev_pos = positions[-1]
+        c = cl.iloc[i]
+        s50 = sma50_prev.iloc[i]
+        s100 = sma100_prev.iloc[i]
+        s200 = sma200_prev.iloc[i]
+        r = rsi_prev.iloc[i]
+        be = bearish.iloc[i]
+        pt = primary_trend.iloc[i]
+        # Sticky 100%: was long and Close > SMA(100)
+        if prev_pos == 1.0 and c >= s100:
+            positions.append(1.0)
+        # Primary trend entry
+        elif pt:
+            positions.append(1.0)
+        # Exit from dip-buy when RSI > 55
+        elif (prev_pos == 0.5 or prev_pos == 0.75) and r > 55:
+            positions.append(0.0)
+        # 75%: bearish and RSI < 35
+        elif be and r < 35:
+            positions.append(0.75)
+        # 50%: bearish and (RSI < 30 or Close >10% below SMA50)
+        elif be and (r < 30 or c < 0.9 * s50):
+            positions.append(0.5)
         else:
-            in_dip.append(False)
-    # Position: 1.0 = 100% SPY, 0.5 = 50% SPY + 50% T-bills, 0.0 = 100% T-bills
-    position = np.where(trend_long.values, 1.0, np.where(in_dip, 0.5, 0.0))
-    df['position'] = position.astype(float)
+            positions.append(0.0)
+    df['position'] = np.array(positions, dtype=float)
 
     daily_tbill = (1 + float(tbill_annual_rate)) ** (1 / 252) - 1
     strategy_values = [float(initial_capital)]

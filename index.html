@@ -1998,7 +1998,7 @@
         },
         sma50_200_tbill: {
           tagline: 'Dials risk up or down as the market mood changes.',
-          math: 'SMA₅₀, SMA₂₀₀: long when Close &gt; SMA₅₀ and SMA₅₀ &gt; SMA₂₀₀; else T-bills. Dip-buy: when bearish, 50% SPY when RSI(14)&lt;30 or price &gt;10% below SMA50; exit when RSI&gt;50 or Close&gt;SMA50.'
+          math: 'Entry: 100% when Close&gt;SMA50 and SMA50&gt;SMA200, or sticky when long and Close&gt;SMA100. 75% when bearish and RSI&lt;35; 50% when bearish and (RSI&lt;30 or price &gt;10% below SMA50). Exit 100% only when Close&lt;SMA100; exit dip-buy when RSI&gt;55. Else T-bills.'
         },
         vix: {
           tagline: 'Looks for opportunity when market fear spikes.',
@@ -2023,7 +2023,7 @@
         }
         if (strategy === 'sma50_200_tbill') {
           var tbill = tbillEl ? Number(tbillEl.value) : 4;
-          return 'Long SPY when Close &gt; SMA(50) and SMA(50) &gt; SMA(200); else T-bills (' + tbill + '%). Dip-buy: in bearish mode, 50% SPY when RSI&lt;30 or price &gt;10% below SMA50; exit when RSI&gt;50 or Close&gt;SMA50. Start $' + capStr + '.';
+          return '100% SPY when trend (Close&gt;SMA50, SMA50&gt;SMA200) or sticky (long and Close&gt;SMA100). 75% when bearish and RSI&lt;35; 50% when bearish and (RSI&lt;30 or &gt;10% below SMA50). Exit 100% when Close&lt;SMA100; exit dip-buy when RSI&gt;55. Else T-bills (' + tbill + '%). Start $' + capStr + '.';
         }
         var period = smaEl ? Number(smaEl.value) || 200 : 200;
         return 'Long SPY when close &gt; ' + period + '-day SMA; else cash. Dip-buy: when bearish (Close&lt;SMA50), 50% SPY when RSI&lt;30 or price &gt;10% below SMA50; exit when RSI&gt;50 or Close&gt;SMA50. Start $' + capStr + '.';
