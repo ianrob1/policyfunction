@@ -653,6 +653,15 @@
     .backtest-config .strategy-params.visible {
       display: block;
     }
+    .backtest-config .strategy-description {
+      grid-column: 1 / -1;
+      font-size: 0.8rem;
+      color: var(--muted);
+      line-height: 1.4;
+      margin: -0.25rem 0 0.5rem;
+      font-style: italic;
+      max-width: 52ch;
+    }
     .btn-run {
       background: linear-gradient(135deg, var(--accent) 0%, #06b6d4 100%);
       color: var(--bg);
@@ -778,12 +787,12 @@
           <label>
             Strategy
             <select id="config-strategy" name="strategy">
-              <option value="sma200">SMA 200 — Long when close &gt; 200d SMA</option>
-              <option value="sma50">SMA 50 — Long when close &gt; 50d SMA</option>
-              <option value="sma50_200_tbill">SMA 50/200 + T-bills — Long when Close &gt; SMA(50) and SMA(50) &gt; SMA(200); else T-bills</option>
-              <option value="vix">VIX — Buy SPY when VIX above threshold</option>
+              <option value="sma200">Trend Regime Overlay</option>
+              <option value="sma50_200_tbill">Dynamic Risk Allocation</option>
+              <option value="vix">Volatility Regime Trigger</option>
             </select>
           </label>
+          <p class="strategy-description" id="strategy-description" aria-live="polite">Systematic time-series momentum filter to condition equity exposure on prevailing market trends.</p>
           <label>
             Start date
             <input type="date" id="config-start" name="start" required />
@@ -1833,13 +1842,18 @@
         var paramsSma = document.getElementById('params-sma');
         var paramsTbill = document.getElementById('params-tbill');
         var paramsVix = document.getElementById('params-vix');
+        var descEl = document.getElementById('strategy-description');
+        var descriptions = {
+          sma200: 'Systematic time-series momentum filter to condition equity exposure on prevailing market trends.',
+          sma50_200_tbill: 'Regime-based allocation framework dynamically shifting between equities and cash equivalents.',
+          vix: 'Volatility-conditioned tactical entry model designed to exploit stress-induced dislocations.'
+        };
         function toggleParams() {
           var s = strategySelect ? strategySelect.value : 'sma200';
-          if (paramsSma) paramsSma.classList.toggle('visible', s === 'sma200' || s === 'sma50');
+          if (paramsSma) paramsSma.classList.toggle('visible', s === 'sma200');
           if (paramsTbill) paramsTbill.classList.toggle('visible', s === 'sma50_200_tbill');
           if (paramsVix) paramsVix.classList.toggle('visible', s === 'vix');
-          var periodInput = document.getElementById('config-sma-period');
-          if (periodInput) periodInput.value = s === 'sma50' ? 50 : 200;
+          if (descEl) descEl.textContent = descriptions[s] || '';
         }
         if (strategySelect) strategySelect.addEventListener('change', toggleParams);
         toggleParams();
@@ -1909,7 +1923,11 @@
             var meta = document.getElementById('sma200-meta');
             if (meta && data.config) meta.textContent = formatDate(data.config.start_date) + ' → ' + formatDate(data.config.end_date);
             var badge = document.getElementById('sma200-badge');
-            if (badge && data.config) badge.textContent = (data.config.strategy || '—') + ' · $' + (data.config.initial_capital != null ? Number(data.config.initial_capital).toLocaleString() : '—');
+            if (badge && data.config) {
+              var names = { sma200: 'Trend Regime Overlay', sma50: 'Trend Regime Overlay', sma50_200_tbill: 'Dynamic Risk Allocation', vix: 'Volatility Regime Trigger' };
+              var label = names[data.config.strategy] || data.config.strategy || '—';
+              badge.textContent = label + ' · $' + (data.config.initial_capital != null ? Number(data.config.initial_capital).toLocaleString() : '—');
+            }
           })
           .catch(function (err) {
             var msg = err && err.message ? err.message : String(err);
