@@ -1,10 +1,10 @@
 {
   "rewrites": [
-    { "source": "/backtest", "destination": "/api/backtest" }
+    {"source": "/backtest", "destination": "/api/backtest"},
+    {"source": "/earnings-check", "destination": "/api/earnings_check"}
   ],
   "functions": {
-    "api/backtest.py": {
-      "maxDuration": 60
-    }
+    "api/backtest.py": {"maxDuration": 60},
+    "api/earnings_check.py": {"maxDuration": 30}
   }
 }
