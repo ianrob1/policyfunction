@@ -816,6 +816,90 @@
     }
 
     footer a:hover { text-decoration: underline; }
+
+    /* Donation footer (from hemingway-ai) */
+    .donations-footer {
+      margin-top: 1rem;
+      padding-top: 1.5rem;
+      text-align: center;
+      font-size: 0.95rem;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+    .donations-footer .donations-title { margin: 8px 0 0; font-weight: 600; }
+    .donations-footer .donations-line { margin: 0; word-break: break-all; }
+    .donations-triggers {
+      margin: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .donations-trigger-wrap { position: relative; }
+    .donations-trigger-wrap::before {
+      content: "";
+      position: absolute;
+      bottom: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 110%;
+      height: 10px;
+      margin-bottom: -1px;
+    }
+    .donations-trigger {
+      position: relative;
+      display: inline-block;
+      cursor: default;
+      text-decoration: none;
+    }
+    .donations-trigger::after {
+      content: "";
+      position: absolute;
+      left: 0; right: 0; bottom: -1px;
+      height: 1px;
+      background: currentColor;
+      transform: scaleX(0);
+      transform-origin: right;
+      transition: transform 180ms ease;
+    }
+    .donations-trigger-wrap:hover .donations-trigger,
+    .donations-trigger-wrap.tooltip-visible .donations-trigger { color: var(--text); }
+    .donations-trigger-wrap:hover .donations-trigger::after,
+    .donations-trigger-wrap.tooltip-visible .donations-trigger::after {
+      transform: scaleX(1);
+      transform-origin: left;
+    }
+    .donations-sep { color: var(--muted); user-select: none; }
+    .donations-hover-content {
+      visibility: hidden;
+      opacity: 0;
+      position: absolute;
+      left: 50%;
+      bottom: calc(100% + 8px);
+      transform: translateX(-50%);
+      padding: 8px 10px;
+      font-size: 0.8rem;
+      line-height: 1.4;
+      max-width: min(90vw, 320px);
+      white-space: normal;
+      word-break: break-all;
+      color: var(--text);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      z-index: 100;
+      cursor: pointer;
+      transition: visibility 0.15s, opacity 0.15s;
+    }
+    .donations-hover-content:not(.donations-hover-crypto) { width: max-content; min-width: 0; }
+    .donations-hover-content.visible { visibility: visible; opacity: 1; }
+    .donations-zelle-line { display: block; cursor: pointer; padding: 2px 0; white-space: nowrap; }
+    .donations-hover-crypto { text-align: left; min-width: 200px; }
+    .donations-crypto-label { font-weight: 700; }
+    .donations-crypto-line { display: block; white-space: nowrap; cursor: pointer; padding: 2px 0; }
+    .donations-crypto-line + .donations-crypto-line { margin-top: 4px; }
   </style>
 </head>
 <body>
@@ -910,10 +994,92 @@
     </main>
 
     <footer>
-      Data from backtest. Not financial advice. Past performance does not guarantee future results.
+      <div class="donations-footer">
+        <p class="donations-triggers">
+          <span class="donations-trigger-wrap" id="donation-zelle-wrap">
+            <span class="donations-trigger">Zelle</span>
+            <span class="donations-hover-content" id="donation-zelle-tooltip" role="tooltip">
+              <span class="donations-zelle-line" id="donation-zelle-copy" data-value="ianrobinson95@gmail.com">ianrobinson95@gmail.com</span>
+            </span>
+          </span>
+          <span class="donations-sep">|</span>
+          <span class="donations-trigger-wrap" id="donation-crypto-wrap">
+            <span class="donations-trigger">Crypto</span>
+            <span class="donations-hover-content donations-hover-crypto" id="donation-crypto-tooltip" role="tooltip">
+              <span class="donations-crypto-line" data-value="bc1qzswva2y28kaqu8u3lukt2mf2kawcgtnh9ypp3a"><span class="donations-crypto-label">BTC</span>: bc1qzswva2y28kaqu8u3lukt2mf2kawcgtnh9ypp3a</span>
+              <span class="donations-crypto-line" data-value="0x6c207dCD2c7bD0b1f6cC5Cb3319D54662a1a62a4"><span class="donations-crypto-label">ETH</span>: 0x6c207dCD2c7bD0b1f6cC5Cb3319D54662a1a62a4</span>
+              <span class="donations-crypto-line" data-value="4Y6JzfAiAn7PckFrLqdv3h7dre1jjTqRoAGBww7XzquV"><span class="donations-crypto-label">SOL</span>: 4Y6JzfAiAn7PckFrLqdv3h7dre1jjTqRoAGBww7XzquV</span>
+            </span>
+          </span>
+        </p>
+        <p class="donations-title">Free and open source — your support helps keep it going.</p>
+      </div>
     </footer>
   </div>
 
+  <script>
+    (function () {
+      var activeTooltip = null;
+      var copyResetTimer = null;
+      var zelleWrap = document.getElementById('donation-zelle-wrap');
+      var cryptoWrap = document.getElementById('donation-crypto-wrap');
+      var zelleTooltip = document.getElementById('donation-zelle-tooltip');
+      var cryptoTooltip = document.getElementById('donation-crypto-tooltip');
+      var zelleCopy = document.getElementById('donation-zelle-copy');
+
+      function showTooltip(name) { activeTooltip = name; updateTooltips(); }
+      function hideTooltip() { activeTooltip = null; updateTooltips(); }
+      function updateTooltips() {
+        zelleWrap.classList.toggle('tooltip-visible', activeTooltip === 'zelle');
+        cryptoWrap.classList.toggle('tooltip-visible', activeTooltip === 'crypto');
+        zelleTooltip.classList.toggle('visible', activeTooltip === 'zelle');
+        cryptoTooltip.classList.toggle('visible', activeTooltip === 'crypto');
+      }
+
+      if (zelleWrap) {
+        zelleWrap.addEventListener('mouseenter', function () { showTooltip('zelle'); });
+        zelleWrap.addEventListener('mouseleave', hideTooltip);
+      }
+      if (cryptoWrap) {
+        cryptoWrap.addEventListener('mouseenter', function () { showTooltip('crypto'); });
+        cryptoWrap.addEventListener('mouseleave', hideTooltip);
+      }
+      if (zelleTooltip) {
+        zelleTooltip.addEventListener('mouseenter', function () { showTooltip('zelle'); });
+        zelleTooltip.addEventListener('mouseleave', hideTooltip);
+      }
+      if (cryptoTooltip) {
+        cryptoTooltip.addEventListener('mouseenter', function () { showTooltip('crypto'); });
+        cryptoTooltip.addEventListener('mouseleave', hideTooltip);
+      }
+
+      function copyAndShowFeedback(el, value) {
+        if (!navigator.clipboard || !navigator.clipboard.writeText) return;
+        navigator.clipboard.writeText(value).catch(function () {});
+        var original = el.innerHTML;
+        el.textContent = 'Copied!';
+        if (copyResetTimer) clearTimeout(copyResetTimer);
+        copyResetTimer = setTimeout(function () {
+          el.innerHTML = original;
+          copyResetTimer = null;
+        }, 1500);
+      }
+
+      if (zelleCopy) {
+        zelleCopy.addEventListener('click', function (e) {
+          e.stopPropagation();
+          copyAndShowFeedback(zelleCopy, zelleCopy.getAttribute('data-value'));
+        });
+      }
+      document.querySelectorAll('.donations-crypto-line').forEach(function (line) {
+        line.addEventListener('click', function (e) {
+          e.stopPropagation();
+          var val = line.getAttribute('data-value');
+          if (val) copyAndShowFeedback(line, val);
+        });
+      });
+    })();
+  </script>
   <script>
     (function () {
       const DATA_URL = '/backtest_results.json';
